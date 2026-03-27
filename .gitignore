@@ -1,0 +1,25 @@
+# Dependencies (catch-all in case someone runs npm install at root)
+node_modules/
+
+# Environment variables — never commit real secrets
+.env
+.env.local
+.env.*.local
+
+# Docker volumes / local data
+mongo_data/
+
+# Logs
+logs/
+*.log
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.sw?
+
+# OS
+Thumbs.db
