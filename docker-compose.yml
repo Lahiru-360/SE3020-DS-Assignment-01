@@ -1,0 +1,122 @@
+version: '3.9'
+
+# ─────────────────────────────────────────────────────────────────
+# HC Platform — Docker Compose
+#
+# Currently registered services:
+#   api-gateway   → port 5000  (public entry point)
+#   auth-service  → port 5007  (internal only)
+#   mongo         → port 27017 (internal only)
+#
+# Add a new service block here each time a new microservice is built.
+# Pattern to follow:
+#   1. Add a service block below (copy the auth-service block as a template)
+#   2. Add its env vars
+#   3. Add it to the `depends_on` list of api-gateway
+#   4. Register its URL in api-gateway's environment block
+# ─────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── MongoDB ───────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: hc-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"         # expose for local tools (Compass, mongosh)
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - hc-network
+
+  # ── Auth Service ──────────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: hc-auth-service
+    restart: unless-stopped
+    env_file:
+      - ./services/auth-service/.env.example   # replace with .env in production
+    environment:
+      PORT: 5007
+      MONGO_URI: mongodb://mongo:27017/auth-service
+      JWT_SECRET: ${JWT_SECRET:-your_super_secret_jwt_key_change_in_production}
+      JWT_EXPIRES_IN: 7d
+      JWT_REFRESH_EXPIRES_IN: 30d
+      PATIENT_SERVICE_URL: http://patient-service:5002
+      DOCTOR_SERVICE_URL: http://doctor-service:5001
+    depends_on:
+      - mongo
+      - patient-service
+      - doctor-service
+    networks:
+      - hc-network
+    # NOT exposed to the host — all traffic must go through the gateway
+
+  # ── Patient Service ───────────────────────────────────────────
+  patient-service:
+    build:
+      context: ./services/patient-service
+      dockerfile: Dockerfile
+    container_name: hc-patient-service
+    restart: unless-stopped
+    env_file:
+      - ./services/patient-service/.env.example   # replace with .env in production
+    environment:
+      PORT: 5002
+      MONGO_URI: mongodb://mongo:27017/patient-service
+    depends_on:
+      - mongo
+    networks:
+      - hc-network
+    # NOT exposed to the host — called internally by auth-service only
+
+  # ── Doctor Service ────────────────────────────────────────────
+  doctor-service:
+    build:
+      context: ./services/doctor-service
+      dockerfile: Dockerfile
+    container_name: hc-doctor-service
+    restart: unless-stopped
+    env_file:
+      - ./services/doctor-service/.env.example    # replace with .env in production
+    environment:
+      PORT: 5001
+      MONGO_URI: mongodb://mongo:27017/doctor-service
+    depends_on:
+      - mongo
+    networks:
+      - hc-network
+    # NOT exposed to the host — called internally by auth-service only
+
+  # ── API Gateway ───────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: hc-api-gateway
+    restart: unless-stopped
+    ports:
+      - "5000:5000"           # single public-facing port
+    environment:
+      PORT: 5000
+      JWT_SECRET: ${JWT_SECRET:-your_super_secret_jwt_key_change_in_production}
+      AUTH_SERVICE_URL: http://auth-service:5007
+    depends_on:
+      - auth-service
+      - patient-service
+      - doctor-service
+    networks:
+      - hc-network
+
+# ── Volumes ────────────────────────────────────────────────────
+volumes:
+  mongo_data:
+    driver: local
+
+# ── Networks ───────────────────────────────────────────────────
+networks:
+  hc-network:
+    driver: bridge
