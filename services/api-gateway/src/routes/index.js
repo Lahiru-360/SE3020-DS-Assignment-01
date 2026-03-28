@@ -13,9 +13,11 @@
 
 import { Router } from 'express';
 import { authRouter } from './auth.routes.js';
+import { patientRouter } from './patient.routes.js';
 
 const router = Router();
 
 router.use(authRouter);
+router.use(patientRouter);
 
 export default router;
