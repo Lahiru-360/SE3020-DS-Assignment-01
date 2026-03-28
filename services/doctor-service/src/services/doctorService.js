@@ -2,6 +2,9 @@ import {
   createDoctor,
   findDoctorByUserId,
   findDoctorByLicense,
+  findPendingDoctors,
+  approveDoctorByUserId,
+  deleteDoctorByUserId,
 } from '../repositories/doctorRepository.js';
 import { createHttpError } from '../utils/httpError.js';
 
@@ -32,3 +35,19 @@ export const createDoctorProfileService = async ({
 
   return doctor;
 };
+
+// ─── Internal admin service functions ─────────────────────────────────────
+
+export const getPendingDoctorsService = () => findPendingDoctors();
+
+export const approveDoctorProfileService = async (userId) => {
+  const doctor = await approveDoctorByUserId(userId);
+  if (!doctor) throw createHttpError('Doctor profile not found', 404);
+  return doctor;
+};
+
+export const deleteDoctorProfileService = async (userId) => {
+  const result = await deleteDoctorByUserId(userId);
+  if (result.deletedCount === 0) throw createHttpError('Doctor profile not found', 404);
+};
+

@@ -5,6 +5,9 @@ import {
   loginService,
   refreshTokenService,
   logoutService,
+  getPendingDoctorsService,
+  approveDoctorService,
+  rejectDoctorService,
 } from '../services/authService.js';
 import { sendSuccess, sendError } from '../utils/responseHelper.js';
 
@@ -24,7 +27,7 @@ export const registerDoctor = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
     const data = await registerDoctorService(req.body);
-    return sendSuccess(res, data, 'Doctor registered successfully', 201);
+    return sendSuccess(res, data, 'Registration submitted. Your account is pending admin approval.', 201);
   } catch (e) {
     next(e);
   }
@@ -58,3 +61,48 @@ export const logout = async (req, res, next) => {
     next(e);
   }
 };
+
+// ─── Admin controllers ─────────────────────────────────────────────────────
+
+const requireAdmin = (req, res, next) => {
+  if (req.headers['x-user-role'] !== 'admin') {
+    return sendError(res, 'Admin access required', 403);
+  }
+  next();
+};
+
+export const getPendingDoctors = [
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const doctors = await getPendingDoctorsService();
+      return sendSuccess(res, doctors, 'Pending doctors retrieved', 200);
+    } catch (e) {
+      next(e);
+    }
+  },
+];
+
+export const approveDoctor = [
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      await approveDoctorService(req.params.userId);
+      return sendSuccess(res, null, 'Doctor approved successfully', 200);
+    } catch (e) {
+      next(e);
+    }
+  },
+];
+
+export const rejectDoctor = [
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      await rejectDoctorService(req.params.userId);
+      return sendSuccess(res, null, 'Doctor rejected and account removed', 200);
+    } catch (e) {
+      next(e);
+    }
+  },
+];

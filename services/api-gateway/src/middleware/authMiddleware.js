@@ -53,3 +53,15 @@ export const verifyToken = (req, res, next) => {
     });
   }
 };
+
+export const requireRole = (...roles) => (req, res, next) => {
+  if (!roles.includes(req.headers['x-user-role'])) {
+    return res.status(403).json({
+      success: false,
+      message: 'Forbidden: insufficient role',
+      data: null,
+    });
+  }
+  next();
+};
+
