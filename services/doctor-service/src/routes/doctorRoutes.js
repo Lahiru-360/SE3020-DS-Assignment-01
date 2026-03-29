@@ -14,6 +14,7 @@
 import { Router } from 'express';
 import {
   createProfile,
+  getDoctorInternal,
   getPendingDoctors,
   approveDoctor,
   deleteDoctorProfile,
@@ -25,6 +26,9 @@ const router = Router();
 
 // ── Profile creation (internal — auth-service only) ───────────────────────
 router.post('/profile', createDoctorProfileValidators, createProfile);
+
+// ── Internal lookup (appointment-service) ─────────────────────────────────
+router.get('/internal/:userId', requireInternalSecret, getDoctorInternal);
 
 // ── Admin approval (internal — auth-service only) ─────────────────────────
 router.get('/internal/pending', requireInternalSecret, getPendingDoctors);

@@ -36,6 +36,14 @@ export const createDoctorProfileService = async ({
   return doctor;
 };
 
+// ─── Internal lookup (called by appointment-service) ─────────────────────────
+
+export const getDoctorByUserIdService = async (userId) => {
+  const doctor = await findDoctorByUserId(userId);
+  if (!doctor) throw createHttpError('Doctor profile not found', 404);
+  return doctor;
+};
+
 // ─── Internal admin service functions ─────────────────────────────────────
 
 export const getPendingDoctorsService = () => findPendingDoctors();

@@ -1,6 +1,7 @@
 import { validationResult } from 'express-validator';
 import {
   createDoctorProfileService,
+  getDoctorByUserIdService,
   getPendingDoctorsService,
   approveDoctorProfileService,
   deleteDoctorProfileService,
@@ -13,6 +14,17 @@ export const createProfile = async (req, res, next) => {
     if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
     const doctor = await createDoctorProfileService(req.body);
     return sendSuccess(res, doctor, 'Doctor profile created', 201);
+  } catch (e) {
+    next(e);
+  }
+};
+
+// ─── Internal lookup (called by appointment-service) ──────────────────────
+
+export const getDoctorInternal = async (req, res, next) => {
+  try {
+    const doctor = await getDoctorByUserIdService(req.params.userId);
+    return sendSuccess(res, doctor, 'Doctor profile retrieved');
   } catch (e) {
     next(e);
   }
