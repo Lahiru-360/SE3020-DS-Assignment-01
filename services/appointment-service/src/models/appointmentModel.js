@@ -1,7 +1,8 @@
 import mongoose from 'mongoose';
 
-// Denormalized fields (patientName, doctorName, etc.) are stored at booking time
-// to avoid cross-service lookups on every read.
+// Minimal appointment schema — only stores IDs (references) and scheduling data.
+// Personal details (names, emails, specialty) are fetched on-demand from
+// patient-service and doctor-service when needed (e.g. for notifications).
 const AppointmentSchema = new mongoose.Schema(
   {
     patientId: {
@@ -11,33 +12,6 @@ const AppointmentSchema = new mongoose.Schema(
     doctorId: {
       type: String,
       required: true,
-    },
-    patientEmail: {
-      type: String,
-      required: true,
-      lowercase: true,
-      trim: true,
-    },
-    doctorEmail: {
-      type: String,
-      required: true,
-      lowercase: true,
-      trim: true,
-    },
-    patientName: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    doctorName: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    specialty: {
-      type: String,
-      required: true,
-      trim: true,
     },
     date: {
       type: Date,

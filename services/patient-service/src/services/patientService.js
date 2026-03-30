@@ -14,3 +14,10 @@ export const updatePatientProfileService = async (userId, fields) => {
   if (!patient) throw createHttpError('Patient profile not found', 404);
   return patient;
 };
+
+// ─── Internal lookup (called by appointment-service) ──────────────────────
+export const getPatientByUserIdService = async (userId) => {
+  const patient = await findPatientByUserId(userId);
+  if (!patient) throw createHttpError('Patient profile not found', 404);
+  return patient;
+};

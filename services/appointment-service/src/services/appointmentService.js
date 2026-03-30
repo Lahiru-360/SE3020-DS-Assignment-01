@@ -20,14 +20,12 @@ const internalHeaders = () => ({ 'internal-secret': process.env.INTERNAL_SECRET 
 // ─── Book appointment ───────────────────────────────────────────────────────
 export const bookAppointmentService = async ({
   patientId,
-  patientEmail,
-  patientName,
   doctorId,
   date,
   timeSlot,
   notes,
 }) => {
-  // Fetch doctor details from doctor-service (internal call)
+  // Validate doctor exists and is approved (internal call to doctor-service)
   let doctor;
   try {
     const { data } = await axios.get(
@@ -42,18 +40,14 @@ export const bookAppointmentService = async ({
   if (!doctor) throw createHttpError('Doctor not found', 404);
   if (!doctor.isApproved) throw createHttpError('Doctor is not approved yet', 400);
 
+  // Store only the minimal references + scheduling data — no personal details
   const appointment = await createAppointment({
     patientId,
-    patientEmail,
-    patientName,
     doctorId,
-    doctorEmail: doctor.email,
-    doctorName:  `${doctor.firstName} ${doctor.lastName}`,
-    specialty:   doctor.specialization,
-    date:        new Date(date),
+    date:    new Date(date),
     timeSlot,
-    notes:       notes || null,
-    status:      'pending',
+    notes:   notes || null,
+    status:  'pending',
   });
 
   // Fire-and-forget notifications to both parties
@@ -115,29 +109,70 @@ export const updateAppointmentStatusService = async (appointmentId, doctorId, ne
   return updated;
 };
 
-// ─── Internal: send notification to patient and doctor ─────────────────────
+// ─── Fetch patient details from patient-service ─────────────────────────────
+async function fetchPatient(patientId) {
+  try {
+    const { data } = await axios.get(
+      `${process.env.PATIENT_SERVICE_URL}/api/patients/internal/${patientId}`,
+      { headers: { 'x-internal-secret': process.env.INTERNAL_SECRET } }
+    );
+    return data.data;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Fetch doctor details from doctor-service ──────────────────────────────
+async function fetchDoctor(doctorId) {
+  try {
+    const { data } = await axios.get(
+      `${process.env.DOCTOR_SERVICE_URL}/api/doctors/internal/${doctorId}`,
+      { headers: internalHeaders() }
+    );
+    return data.data;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Send notification to patient and doctor ───────────────────────────────
+// Fetches personal details on-demand — no personal data stored in appointment.
 async function notifyBoth(type, appt) {
+  const [patient, doctor] = await Promise.all([
+    fetchPatient(appt.patientId),
+    fetchDoctor(appt.doctorId),
+  ]);
+
+  const patientEmail = patient?.email ?? '';
+  const patientName  = patient ? `${patient.firstName} ${patient.lastName}` : 'Patient';
+  const doctorEmail  = doctor?.email  ?? '';
+  const doctorName   = doctor  ? `${doctor.firstName} ${doctor.lastName}`   : 'Doctor';
+  const specialty    = doctor?.specialization ?? '';
+
+  const metadata = {
+    appointmentId: appt._id,
+    patientName,
+    doctorName,
+    specialty,
+    date:     appt.date,
+    timeSlot: appt.timeSlot,
+    status:   appt.status,
+  };
+
   const recipients = [
-    { email: appt.patientEmail, name: appt.patientName },
-    { email: appt.doctorEmail,  name: `Dr. ${appt.doctorName}` },
+    { email: patientEmail, name: patientName },
+    { email: doctorEmail,  name: `Dr. ${doctorName}` },
   ];
 
   for (const recipient of recipients) {
+    if (!recipient.email) continue;
     await axios.post(
       `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/send`,
       {
         type,
         recipientEmail: recipient.email,
         recipientName:  recipient.name,
-        metadata: {
-          appointmentId: appt._id,
-          patientName:   appt.patientName,
-          doctorName:    appt.doctorName,
-          specialty:     appt.specialty,
-          date:          appt.date,
-          timeSlot:      appt.timeSlot,
-          status:        appt.status,
-        },
+        metadata,
       },
       { headers: internalHeaders() }
     );

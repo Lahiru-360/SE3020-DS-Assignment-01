@@ -4,10 +4,6 @@ export const bookAppointmentValidators = [
   body('doctorId')
     .trim()
     .notEmpty().withMessage('doctorId is required'),
-  body('patientName')
-    .trim()
-    .notEmpty().withMessage('patientName is required')
-    .isLength({ max: 100 }).withMessage('patientName must not exceed 100 characters'),
   body('date')
     .isISO8601().withMessage('A valid date (ISO 8601) is required'),
   body('timeSlot')

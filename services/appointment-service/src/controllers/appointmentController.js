@@ -14,16 +14,13 @@ export const bookAppointment = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
 
-    const patientId    = req.headers['x-user-id'];
-    const patientEmail = req.headers['x-user-email'];
+    const patientId = req.headers['x-user-id'];
     if (!patientId) return sendError(res, 'Unauthorized', 401);
 
-    const { doctorId, patientName, date, timeSlot, notes } = req.body;
+    const { doctorId, date, timeSlot, notes } = req.body;
 
     const appointment = await bookAppointmentService({
       patientId,
-      patientEmail,
-      patientName,
       doctorId,
       date,
       timeSlot,
