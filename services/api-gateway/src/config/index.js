@@ -5,8 +5,11 @@
 // ─────────────────────────────────────────────────────
 
 export const config = Object.freeze({
-  PORT:                process.env.PORT || 5000,
-  JWT_SECRET:          process.env.JWT_SECRET,
-  AUTH_SERVICE_URL:    process.env.AUTH_SERVICE_URL,
-  PATIENT_SERVICE_URL: process.env.PATIENT_SERVICE_URL,
+  PORT:                        process.env.PORT || 5000,
+  JWT_SECRET:                  process.env.JWT_SECRET,
+  AUTH_SERVICE_URL:            process.env.AUTH_SERVICE_URL,
+  PATIENT_SERVICE_URL:         process.env.PATIENT_SERVICE_URL,
+  DOCTOR_SERVICE_URL:          process.env.DOCTOR_SERVICE_URL,
+  APPOINTMENT_SERVICE_URL:     process.env.APPOINTMENT_SERVICE_URL,
+  NOTIFICATION_SERVICE_URL:    process.env.NOTIFICATION_SERVICE_URL,
 });
