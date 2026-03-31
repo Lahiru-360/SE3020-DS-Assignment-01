@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-// Persists a log of every notification attempt for audit/retry purposes.
+// Persists a log of every notification attempt (email + SMS) for audit/retry purposes.
 const NotificationSchema = new mongoose.Schema(
   {
     type: {
@@ -13,6 +13,8 @@ const NotificationSchema = new mongoose.Schema(
       ],
       required: true,
     },
+
+    // ── Email channel ──────────────────────────────────────────────────────
     recipientEmail: {
       type: String,
       required: true,
@@ -33,6 +35,24 @@ const NotificationSchema = new mongoose.Schema(
       enum: ['sent', 'failed'],
       required: true,
     },
+
+    // ── SMS channel (optional) ─────────────────────────────────────────────
+    recipientPhone: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    smsStatus: {
+      type: String,
+      enum: ['sent', 'failed', 'skipped'],
+      default: 'skipped',
+    },
+    smsSid: {
+      type: String,   // Twilio Message SID (SM…)
+      default: null,
+    },
+
+    // ── Shared metadata ────────────────────────────────────────────────────
     // Flexible store for appointment details (id, names, date, etc.)
     metadata: {
       type: mongoose.Schema.Types.Mixed,

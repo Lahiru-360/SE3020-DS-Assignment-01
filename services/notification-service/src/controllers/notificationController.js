@@ -8,12 +8,13 @@ export const sendNotification = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
 
-    const { type, recipientEmail, recipientName, metadata } = req.body;
+    const { type, recipientEmail, recipientName, recipientPhone, metadata } = req.body;
 
     const record = await processNotificationService({
       type,
       recipientEmail,
       recipientName,
+      recipientPhone,   // optional — triggers SMS channel when present
       metadata,
     });
 
