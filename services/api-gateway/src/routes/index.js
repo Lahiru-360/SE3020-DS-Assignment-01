@@ -14,10 +14,12 @@
 import { Router } from 'express';
 import { authRouter } from './auth.routes.js';
 import { patientRouter } from './patient.routes.js';
+import { paymentRouter } from './payment.routes.js';
 
 const router = Router();
 
 router.use(authRouter);
 router.use(patientRouter);
+router.use(paymentRouter);
 
 export default router;

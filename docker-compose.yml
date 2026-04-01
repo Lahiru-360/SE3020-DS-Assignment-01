@@ -103,6 +103,27 @@ services:
       - hc-network
     # NOT exposed to the host — called internally by auth-service only
 
+  # ── Payment Service ───────────────────────────────────────────
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: hc-payment-service
+    restart: unless-stopped
+    env_file:
+      - ./services/payment-service/.env.example
+    environment:
+      PORT: 5005
+      MONGO_URI: mongodb://mongo:27017/payment-service
+    depends_on:
+      - mongo
+    volumes:
+      - ./services/payment-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+    # NOT exposed to the host — all traffic must go through the gateway
+
   # ── API Gateway ───────────────────────────────────────────────
   api-gateway:
     build:
@@ -117,10 +138,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:-your_super_secret_jwt_key_change_in_production}
       AUTH_SERVICE_URL: http://auth-service:5007
       PATIENT_SERVICE_URL: http://patient-service:5002
+      PAYMENT_SERVICE_URL: http://payment-service:5005
     depends_on:
       - auth-service
       - patient-service
       - doctor-service
+      - payment-service
     volumes:
       - ./services/api-gateway:/app
       - /app/node_modules
