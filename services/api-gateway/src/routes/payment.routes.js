@@ -20,6 +20,7 @@ const router = Router();
 
 // Proxy factory — reused for both protected and webhook routes.
 const paymentProxy = createProxyMiddleware({
+  pathFilter: '/api/payments',
   target: config.PAYMENT_SERVICE_URL,
   changeOrigin: true,
   on: {
@@ -33,10 +34,16 @@ const paymentProxy = createProxyMiddleware({
   },
 });
 
-// ── Stripe Webhook — NO JWT (Stripe calls this, not the browser) ──────────
-router.post('/api/payments/webhook', paymentProxy);
+// ── Guard payment paths — runs before the proxy, preserves full URL ───────────
+// We apply verifyToken to all /api/payments/* EXCEPT the /webhook route.
+router.use('/api/payments', (req, res, next) => {
+  // express.router.use strips the prefix inside the handler, so req.path 
+  // is just the portion after '/api/payments'.
+  if (req.path === '/webhook') return next();
+  verifyToken(req, res, next);
+});
 
-// ── All other payment routes — JWT REQUIRED ───────────────────────────────
-router.use('/api/payments', verifyToken, paymentProxy);
+// Single proxy for all /api/payments/* — always sees the full original path.
+router.use(paymentProxy);
 
 export { router as paymentRouter };
