@@ -3,13 +3,13 @@
  *
  * Guards endpoints that should only be reachable from other internal services.
  * Any service making an internal call must include the header:
- *   "internal-secret": <INTERNAL_SECRET from env>
+ *   "x-internal-secret": <INTERNAL_SECRET from env>
  *
  * The API Gateway should NEVER forward this header from external clients —
  * it is stripped at the gateway level, so only true inter-service calls will pass.
  */
 export const internalAuth = (req, res, next) => {
-  const secret = req.headers['internal-secret'];
+  const secret = req.headers['x-internal-secret'];
 
   if (!secret || secret !== process.env.INTERNAL_SECRET) {
     return res.status(403).json({

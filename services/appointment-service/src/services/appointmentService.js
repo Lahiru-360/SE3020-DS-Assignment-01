@@ -14,8 +14,8 @@ const STATUS_TRANSITIONS = {
   confirmed: ['completed', 'cancelled'],
 };
 
-// ─── Internal call helpers ──────────────────────────────────────────────────
-const internalHeaders = () => ({ 'internal-secret': process.env.INTERNAL_SECRET });
+// ─── Internal call helper ───────────────────────────────────────────────────
+const internalHeaders = () => ({ 'x-internal-secret': process.env.INTERNAL_SECRET });
 
 // ─── Book appointment ───────────────────────────────────────────────────────
 export const bookAppointmentService = async ({
@@ -145,6 +145,7 @@ async function notifyBoth(type, appt) {
 
   const patientEmail = patient?.email ?? '';
   const patientName  = patient ? `${patient.firstName} ${patient.lastName}` : 'Patient';
+  const patientPhone = patient?.phone ?? null;
   const doctorEmail  = doctor?.email  ?? '';
   const doctorName   = doctor  ? `${doctor.firstName} ${doctor.lastName}`   : 'Doctor';
   const specialty    = doctor?.specialization ?? '';
@@ -160,7 +161,7 @@ async function notifyBoth(type, appt) {
   };
 
   const recipients = [
-    { email: patientEmail, name: patientName },
+    { email: patientEmail, name: patientName, phone: patientPhone },
     { email: doctorEmail,  name: `Dr. ${doctorName}` },
   ];
 
@@ -172,6 +173,7 @@ async function notifyBoth(type, appt) {
         type,
         recipientEmail: recipient.email,
         recipientName:  recipient.name,
+        recipientPhone: recipient.phone,
         metadata,
       },
       { headers: internalHeaders() }
