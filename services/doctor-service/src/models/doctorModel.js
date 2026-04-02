@@ -43,6 +43,10 @@ const DoctorSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    isApproved: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );

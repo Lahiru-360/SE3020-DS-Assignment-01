@@ -2,6 +2,9 @@ import { validationResult } from "express-validator";
 import {
   createDoctorProfileService,
   updateDoctorProfileService,
+  getPendingDoctorsService,
+  approveDoctorProfileService,
+  deleteDoctorProfileService,
 } from "../services/doctorService.js";
 import { sendSuccess, sendError } from "../utils/responseHelper.js";
 
@@ -24,6 +27,35 @@ export const updateProfile = async (req, res, next) => {
     const { userId } = req.params;
     const doctor = await updateDoctorProfileService(userId, req.body);
     return sendSuccess(res, doctor, "Doctor profile updated successfully", 200);
+  } catch (e) {
+    next(e);
+  }
+};
+
+// ─── Internal admin controllers ────────────────────────────────────────────
+
+export const getPendingDoctors = async (req, res, next) => {
+  try {
+    const doctors = await getPendingDoctorsService();
+    return sendSuccess(res, doctors, "Pending doctors retrieved", 200);
+  } catch (e) {
+    next(e);
+  }
+};
+
+export const approveDoctor = async (req, res, next) => {
+  try {
+    const doctor = await approveDoctorProfileService(req.params.userId);
+    return sendSuccess(res, doctor, "Doctor profile approved", 200);
+  } catch (e) {
+    next(e);
+  }
+};
+
+export const deleteDoctorProfile = async (req, res, next) => {
+  try {
+    await deleteDoctorProfileService(req.params.userId);
+    return sendSuccess(res, null, "Doctor profile removed", 200);
   } catch (e) {
     next(e);
   }

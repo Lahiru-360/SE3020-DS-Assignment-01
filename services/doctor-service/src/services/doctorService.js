@@ -3,6 +3,9 @@ import {
   findDoctorByUserId,
   findDoctorByLicense,
   updateDoctorByUserId,
+  findPendingDoctors,
+  approveDoctorByUserId,
+  deleteDoctorByUserId,
 } from "../repositories/doctorRepository.js";
 import { createHttpError } from "../utils/httpError.js";
 
@@ -58,4 +61,19 @@ export const updateDoctorProfileService = async (userId, updateData) => {
   if (!updatedDoctor) throw createHttpError("Doctor profile not found", 404);
 
   return updatedDoctor;
+};
+// ─── Internal admin service functions ─────────────────────────────────────
+
+export const getPendingDoctorsService = () => findPendingDoctors();
+
+export const approveDoctorProfileService = async (userId) => {
+  const doctor = await approveDoctorByUserId(userId);
+  if (!doctor) throw createHttpError("Doctor profile not found", 404);
+  return doctor;
+};
+
+export const deleteDoctorProfileService = async (userId) => {
+  const result = await deleteDoctorByUserId(userId);
+  if (result.deletedCount === 0)
+    throw createHttpError("Doctor profile not found", 404);
 };

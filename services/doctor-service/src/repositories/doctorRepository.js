@@ -12,3 +12,11 @@ export const updateDoctorByUserId = (userId, updateData) =>
     new: true,
     runValidators: true,
   });
+
+export const findPendingDoctors = () => DoctorModel.find({ isApproved: false });
+
+export const approveDoctorByUserId = (userId) =>
+  DoctorModel.findOneAndUpdate({ userId }, { isApproved: true }, { new: true });
+
+export const deleteDoctorByUserId = (userId) =>
+  DoctorModel.deleteOne({ userId });

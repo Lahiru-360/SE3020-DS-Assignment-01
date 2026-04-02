@@ -44,10 +44,14 @@ services:
       JWT_REFRESH_EXPIRES_IN: 30d
       PATIENT_SERVICE_URL: http://patient-service:5002
       DOCTOR_SERVICE_URL: http://doctor-service:5001
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
     depends_on:
       - mongo
       - patient-service
       - doctor-service
+    volumes:
+      - ./services/auth-service:/app
+      - /app/node_modules
     networks:
       - hc-network
     # NOT exposed to the host — all traffic must go through the gateway
@@ -64,8 +68,12 @@ services:
     environment:
       PORT: 5002
       MONGO_URI: mongodb://mongo:27017/patient-service
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
     depends_on:
       - mongo
+    volumes:
+      - ./services/patient-service:/app
+      - /app/node_modules
     networks:
       - hc-network
     # NOT exposed to the host — called internally by auth-service only
@@ -82,8 +90,12 @@ services:
     environment:
       PORT: 5001
       MONGO_URI: mongodb://mongo:27017/doctor-service
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
     depends_on:
       - mongo
+    volumes:
+      - ./services/doctor-service:/app
+      - /app/node_modules
     networks:
       - hc-network
     # NOT exposed to the host — called internally by auth-service only
@@ -101,10 +113,14 @@ services:
       PORT: 5000
       JWT_SECRET: ${JWT_SECRET:-your_super_secret_jwt_key_change_in_production}
       AUTH_SERVICE_URL: http://auth-service:5007
+      PATIENT_SERVICE_URL: http://patient-service:5002
     depends_on:
       - auth-service
       - patient-service
       - doctor-service
+    volumes:
+      - ./services/api-gateway:/app
+      - /app/node_modules
     networks:
       - hc-network
 
