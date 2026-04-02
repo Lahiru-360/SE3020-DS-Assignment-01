@@ -5,12 +5,19 @@
 // auth-service during the registration flow.
 // ─────────────────────────────────────────────
 
-import { Router } from 'express';
-import { createProfile } from '../controllers/doctorController.js';
-import { createDoctorProfileValidators } from '../validators/doctorValidators.js';
+import { Router } from "express";
+import {
+  createProfile,
+  updateProfile,
+} from "../controllers/doctorController.js";
+import {
+  createDoctorProfileValidators,
+  updateDoctorProfileValidators,
+} from "../validators/doctorValidators.js";
 
 const router = Router();
 
-router.post('/profile', createDoctorProfileValidators, createProfile);
+router.post("/profile", createDoctorProfileValidators, createProfile);
+router.put("/profile/:userId", updateDoctorProfileValidators, updateProfile);
 
 export default router;

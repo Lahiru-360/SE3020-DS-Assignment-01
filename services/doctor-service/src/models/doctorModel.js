@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 // Stores the doctor profile created by auth-service during registration.
 // userId is the _id from auth-service's users collection — the canonical link
@@ -44,9 +44,9 @@ const DoctorSchema = new mongoose.Schema(
       trim: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-const DoctorModel = mongoose.model('Doctor', DoctorSchema);
+const DoctorModel = mongoose.model("Doctor", DoctorSchema);
 
 export default DoctorModel;
