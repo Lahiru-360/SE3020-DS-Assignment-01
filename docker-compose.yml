@@ -60,7 +60,7 @@ services:
     container_name: hc-patient-service
     restart: unless-stopped
     env_file:
-      - ./services/patient-service/.env # replace with .env in production
+      - ./services/patient-service/.env.example # replace with .env in production
     environment:
       PORT: 5002
       MONGO_URI: mongodb://mongo:27017/patient-service
@@ -78,7 +78,7 @@ services:
     container_name: hc-doctor-service
     restart: unless-stopped
     env_file:
-      - ./services/doctor-service/.env # replace with .env in production
+      - ./services/doctor-service/.env.example # replace with .env in production
     environment:
       PORT: 5001
       MONGO_URI: mongodb://mongo:27017/doctor-service
