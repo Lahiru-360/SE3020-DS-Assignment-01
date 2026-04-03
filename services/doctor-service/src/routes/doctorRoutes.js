@@ -11,29 +11,32 @@
 //   API Gateway.
 // ─────────────────────────────────────────────
 
-import { Router } from 'express';
+import { Router } from "express";
 import {
   createProfile,
+  updateProfile,
   getDoctorInternal,
   getPendingDoctors,
   approveDoctor,
   deleteDoctorProfile,
-} from '../controllers/doctorController.js';
-import { createDoctorProfileValidators } from '../validators/doctorValidators.js';
-import { requireInternalSecret } from '../middleware/internalAuth.js';
+} from "../controllers/doctorController.js";
+import {
+  createDoctorProfileValidators,
+  updateDoctorProfileValidators,
+} from "../validators/doctorValidators.js";
+import { requireInternalSecret } from "../middleware/internalAuth.js";
 
 const router = Router();
 
-// ── Profile creation (internal — auth-service only) ───────────────────────
-router.post('/profile', createDoctorProfileValidators, createProfile);
+router.post("/profile", createDoctorProfileValidators, createProfile);
+router.put("/profile/:userId", updateDoctorProfileValidators, updateProfile);
 
 // ── Internal lookup (appointment-service) ─────────────────────────────────
 router.get('/internal/:userId', requireInternalSecret, getDoctorInternal);
 
 // ── Admin approval (internal — auth-service only) ─────────────────────────
-router.get('/internal/pending', requireInternalSecret, getPendingDoctors);
-router.patch('/internal/:userId/approve', requireInternalSecret, approveDoctor);
-router.delete('/internal/:userId', requireInternalSecret, deleteDoctorProfile);
+router.get("/internal/pending", requireInternalSecret, getPendingDoctors);
+router.patch("/internal/:userId/approve", requireInternalSecret, approveDoctor);
+router.delete("/internal/:userId", requireInternalSecret, deleteDoctorProfile);
 
 export default router;
-
