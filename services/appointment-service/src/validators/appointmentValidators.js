@@ -1,4 +1,4 @@
-import { body } from 'express-validator';
+import { body, query } from 'express-validator';
 
 export const bookAppointmentValidators = [
   body('doctorId')
@@ -20,3 +20,23 @@ export const updateStatusValidators = [
     .isIn(['confirmed', 'cancelled', 'completed'])
     .withMessage('status must be one of: confirmed, cancelled, completed'),
 ];
+
+export const searchDoctorsValidators = [
+  query('specialization')
+    .optional()
+    .trim()
+    .notEmpty().withMessage('specialization cannot be blank'),
+  query('name')
+    .optional()
+    .trim()
+    .notEmpty().withMessage('name cannot be blank'),
+];
+
+export const getAvailableSlotsValidators = [
+  query('doctorId')
+    .trim()
+    .notEmpty().withMessage('doctorId is required'),
+  query('date')
+    .matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('date must be in YYYY-MM-DD format'),
+];
+

@@ -16,17 +16,23 @@ import {
   getDoctorAppointments,
   cancelAppointment,
   updateAppointmentStatus,
+  searchDoctors,
+  getAvailableSlots,
 } from '../controllers/appointmentController.js';
 import {
   bookAppointmentValidators,
   updateStatusValidators,
+  searchDoctorsValidators,
+  getAvailableSlotsValidators,
 } from '../validators/appointmentValidators.js';
 
 const router = Router();
 
 // ── Patient-facing ────────────────────────────────────────────────────────────
-router.post('/',       bookAppointmentValidators, bookAppointment);
-router.get('/my',      getMyAppointments);
+router.get('/doctors/search', searchDoctorsValidators,     searchDoctors);
+router.get('/slots',          getAvailableSlotsValidators, getAvailableSlots);
+router.post('/',              bookAppointmentValidators,   bookAppointment);
+router.get('/my',             getMyAppointments);
 
 // ── Doctor-facing ─────────────────────────────────────────────────────────────
 router.get('/doctor',  getDoctorAppointments);
@@ -36,3 +42,4 @@ router.patch('/:id/status', updateStatusValidators, updateAppointmentStatus);
 router.patch('/:id/cancel', cancelAppointment);
 
 export default router;
+

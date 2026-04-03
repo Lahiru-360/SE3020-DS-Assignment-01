@@ -21,6 +21,8 @@ router.use('/api/appointments', verifyToken);
 
 // ── Role-specific guards ───────────────────────────────────────────────────
 // These call next() if authorized, allowing the proxy below to forward the request.
+router.get('/api/appointments/doctors/search', requireRole('patient'));
+router.get('/api/appointments/slots',          requireRole('patient'));
 router.post('/api/appointments',              requireRole('patient'));
 router.get('/api/appointments/my',           requireRole('patient'));
 router.get('/api/appointments/doctor',       requireRole('doctor'));

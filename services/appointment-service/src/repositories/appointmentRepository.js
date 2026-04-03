@@ -12,3 +12,22 @@ export const findAppointmentsByDoctorId = (doctorId) =>
 
 export const updateAppointmentById = (id, updates) =>
   AppointmentModel.findByIdAndUpdate(id, updates, { new: true });
+
+// ─── Active bookings for a doctor on a specific date (for slot computation) ──
+// dateStr must be "YYYY-MM-DD". Queries pending + confirmed only — cancelled/
+// completed appointments do NOT occupy a slot.
+//
+// UTC boundary note: `new Date("YYYY-MM-DD")` in Node.js is interpreted as
+// UTC midnight, so the start/end boundaries here (T00:00:00.000Z / T23:59:59.999Z)
+// are consistent with how bookAppointmentService stores dates via `new Date(date)`.
+// Both sides use UTC — do NOT change one without changing the other.
+export const findActiveBookingsForDoctorOnDate = (doctorId, dateStr) => {
+  const start = new Date(`${dateStr}T00:00:00.000Z`);
+  const end   = new Date(`${dateStr}T23:59:59.999Z`);
+  return AppointmentModel.find({
+    doctorId,
+    date:   { $gte: start, $lte: end },
+    status: { $in: ['pending', 'confirmed'] },
+  }).select('timeSlot');
+};
+
