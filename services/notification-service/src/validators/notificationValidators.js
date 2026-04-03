@@ -1,30 +1,78 @@
 import { body } from 'express-validator';
 
 export const sendNotificationValidators = [
+  // ── type — any non-empty string (appointment_booked, auth_otp, payment_confirmed, …)
   body('type')
-    .isIn([
-      'appointment_booked',
-      'appointment_confirmed',
-      'appointment_cancelled',
-      'appointment_completed',
-    ])
-    .withMessage('Invalid notification type'),
+    .trim()
+    .notEmpty()
+    .withMessage('type is required (e.g. appointment_booked, auth_otp)'),
 
-  body('recipientEmail')
-    .isEmail().withMessage('Valid recipientEmail is required')
-    .normalizeEmail(),
+  // ── channel — which delivery channel(s) to use
+  body('channel')
+    .optional()
+    .isIn(['email', 'sms', 'both'])
+    .withMessage("channel must be 'email', 'sms', or 'both'"),
 
+  // ── recipientName — always required
   body('recipientName')
     .trim()
-    .notEmpty().withMessage('recipientName is required'),
+    .notEmpty()
+    .withMessage('recipientName is required'),
 
-  // Optional — if provided, must be a valid E.164 phone number (e.g. +94722745000)
+  // ── recipientEmail — required only when channel is 'email' or 'both' (or unset → defaults to 'both')
+  body('recipientEmail')
+    .if((value, { req }) => {
+      const ch = req.body.channel;
+      return !ch || ch === 'email' || ch === 'both';
+    })
+    .notEmpty()
+    .withMessage('recipientEmail is required for email/both channel')
+    .bail()
+    .isEmail()
+    .withMessage('recipientEmail must be a valid email address')
+    .normalizeEmail(),
+
+  // ── recipientPhone — required only when channel is 'sms' or 'both'
   body('recipientPhone')
-    .optional({ nullable: true })
+    .if((value, { req }) => {
+      const ch = req.body.channel;
+      return ch === 'sms' || ch === 'both';
+    })
+    .notEmpty()
+    .withMessage('recipientPhone is required for sms/both channel')
+    .bail()
     .matches(/^\+[1-9]\d{6,14}$/)
     .withMessage('recipientPhone must be a valid E.164 number (e.g. +94722745000)'),
 
+  // ── recipientPhone — when present and channel is email, still validate format
+  body('recipientPhone')
+    .optional({ nullable: true })
+    .if((value) => value !== null && value !== undefined && value !== '')
+    .matches(/^\+[1-9]\d{6,14}$/)
+    .withMessage('recipientPhone must be a valid E.164 number (e.g. +94722745000)'),
+
+  // ── subject — optional custom subject line (email)
+  body('subject')
+    .optional({ nullable: true })
+    .trim()
+    .notEmpty()
+    .withMessage('subject must not be an empty string if provided'),
+
+  // ── message — optional plain-text body (email body / SMS body override)
+  body('message')
+    .optional({ nullable: true })
+    .trim()
+    .notEmpty()
+    .withMessage('message must not be an empty string if provided'),
+
+  // ── source — optional originating service identifier
+  body('source')
+    .optional({ nullable: true })
+    .trim(),
+
+  // ── metadata — optional key-value bag
   body('metadata')
     .optional()
-    .isObject().withMessage('metadata must be an object'),
+    .isObject()
+    .withMessage('metadata must be an object'),
 ];
