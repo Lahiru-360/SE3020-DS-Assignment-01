@@ -19,6 +19,7 @@ import {
   getPendingDoctors,
   approveDoctor,
   deleteDoctorProfile,
+  searchDoctors,
 } from "../controllers/doctorController.js";
 import {
   createDoctorProfileValidators,
@@ -32,11 +33,14 @@ router.post("/profile", createDoctorProfileValidators, createProfile);
 router.put("/profile/:userId", updateDoctorProfileValidators, updateProfile);
 
 // ── Internal lookup (appointment-service) ─────────────────────────────────
-router.get('/internal/:userId', requireInternalSecret, getDoctorInternal);
+router.get('/internal/search', requireInternalSecret, searchDoctors);
 
 // ── Admin approval (internal — auth-service only) ─────────────────────────
 router.get("/internal/pending", requireInternalSecret, getPendingDoctors);
 router.patch("/internal/:userId/approve", requireInternalSecret, approveDoctor);
+
+// ── Internal lookup by userId (keep after static internal routes) ─────────
+router.get('/internal/:userId', requireInternalSecret, getDoctorInternal);
 router.delete("/internal/:userId", requireInternalSecret, deleteDoctorProfile);
 
 export default router;

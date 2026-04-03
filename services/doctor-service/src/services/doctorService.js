@@ -6,6 +6,7 @@ import {
   findPendingDoctors,
   approveDoctorByUserId,
   deleteDoctorByUserId,
+  searchDoctors,
 } from "../repositories/doctorRepository.js";
 import { createHttpError } from "../utils/httpError.js";
 
@@ -85,4 +86,15 @@ export const deleteDoctorProfileService = async (userId) => {
   const result = await deleteDoctorByUserId(userId);
   if (result.deletedCount === 0)
     throw createHttpError("Doctor profile not found", 404);
+};
+
+// ─── Internal search (called by appointment-service) ─────────────────────────
+
+export const searchDoctorsService = async ({ specialization, name } = {}) => {
+  if (!specialization && !name) {
+    throw createHttpError('At least one search filter (specialization or name) is required', 400);
+  }
+
+  const doctors = await searchDoctors({ specialization, name });
+  return doctors;
 };
