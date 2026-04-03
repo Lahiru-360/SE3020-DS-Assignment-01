@@ -1,0 +1,279 @@
+import {
+  createAvailability,
+  findAvailabilityByDoctorAndDate,
+  findAvailabilitiesByDoctor,
+  updateAvailability,
+} from "../repositories/availabilityRepository.js";
+import { createHttpError } from "../utils/httpError.js";
+
+const HOURS = [
+  "06:00",
+  "07:00",
+  "08:00",
+  "09:00",
+  "10:00",
+  "11:00",
+  "12:00",
+  "13:00",
+  "14:00",
+  "15:00",
+  "16:00",
+  "17:00",
+  "18:00",
+  "19:00",
+  "20:00",
+  "21:00",
+  "22:00",
+];
+
+const areConsecutive = (indexes) => {
+  if (!Array.isArray(indexes) || indexes.length === 0) return false;
+  const sorted = [...indexes].sort((a, b) => a - b);
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] !== sorted[i - 1] + 1) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const isWithinPhase = (indexes, phase) => {
+  if (!Array.isArray(indexes) || indexes.length === 0) return false;
+  const minIndex = Math.min(...indexes);
+  const maxIndex = Math.max(...indexes);
+
+  if (phase === "morning") {
+    // 06:00 to 12:00 (indexes 0 to 5)
+    return minIndex >= 0 && maxIndex <= 5;
+  } else if (phase === "evening") {
+    // 12:00 to 22:00 (indexes 6 to 15)
+    return minIndex >= 6 && maxIndex <= 15;
+  }
+  return false;
+};
+
+export const addAvailabilityService = async (doctorId, date, slots) => {
+  // Validate that the date is within the next 7 days
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalize today to midnight
+
+  const targetDate = new Date(date);
+  targetDate.setHours(0, 0, 0, 0);
+
+  // Direct comparison for past dates
+  if (targetDate < today) {
+    throw createHttpError("Cannot add availability for past dates.", 400);
+  }
+
+  const maxDate = new Date(today);
+  maxDate.setDate(today.getDate() + 7);
+
+  if (targetDate > maxDate) {
+    throw createHttpError(
+      "Doctors can only add availability up to 7 days in advance.",
+      400,
+    );
+  }
+
+  // Check if availability for this date already exists for the doctor
+  const existingAvailability = await findAvailabilityByDoctorAndDate(
+    doctorId,
+    date,
+  );
+
+  if (existingAvailability) {
+    // Optionally update instead of throwing an error:
+    // But throwing an error gives better explicit feedback
+    throw createHttpError(
+      "Availability already exists. Consider updating it instead.",
+      409,
+    );
+  }
+
+  // Validation Rule 1: Max 2 slots
+  if (!slots || slots.length > 2) {
+    throw createHttpError("Maximum 2 slots allowed", 400);
+  }
+
+  const timeslots = [];
+
+  for (const slot of slots) {
+    const { phase, indexes } = slot;
+
+    // Validation Rule 2
+    if (!areConsecutive(indexes)) {
+      throw createHttpError("Indexes must be consecutive", 400);
+    }
+
+    // Validation Rule 3
+    if (!isWithinPhase(indexes, phase)) {
+      throw createHttpError("Invalid phase range", 400);
+    }
+
+    // Convert Indexes -> Time Range
+    const sortedIndexes = [...indexes].sort((a, b) => a - b);
+    const firstIndex = sortedIndexes[0];
+    const lastIndex = sortedIndexes[sortedIndexes.length - 1];
+
+    const startTime = HOURS[firstIndex];
+    const endTime = HOURS[lastIndex + 1];
+
+    timeslots.push({
+      startTime,
+      endTime,
+      phase,
+      isBooked: false,
+    });
+  }
+
+  // Rule 4: No overlap between blocks - same phases check
+  if (slots.length === 2 && slots[0].phase === slots[1].phase) {
+    throw createHttpError("Same phase cannot have multiple blocks", 400);
+  }
+
+  const newAvailability = await createAvailability({
+    doctorId,
+    date,
+    timeslots,
+  });
+
+  return newAvailability;
+};
+
+export const getDoctorAvailabilitiesService = async (doctorId) => {
+  return await findAvailabilitiesByDoctor(doctorId);
+};
+
+export const editAvailabilityTimeslotService = async (
+  doctorId,
+  date,
+  phase,
+  indexes,
+) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalize today to midnight
+
+  const targetDate = new Date(date);
+  targetDate.setHours(0, 0, 0, 0);
+
+  if (targetDate < today) {
+    throw createHttpError("Cannot edit past availability", 400);
+  }
+
+  // Find the exact document
+  let availabilityDoc = await findAvailabilityByDoctorAndDate(doctorId, date);
+  if (!availabilityDoc) {
+    throw createHttpError("Availability not found for this date", 404);
+  }
+
+  // Validate indexes
+  if (!areConsecutive(indexes)) {
+    throw createHttpError("Indexes must be consecutive", 400);
+  }
+
+  if (!isWithinPhase(indexes, phase)) {
+    throw createHttpError("Invalid phase range", 400);
+  }
+
+  // Convert Indexes to new Start and End Time
+  const sortedIndexes = [...indexes].sort((a, b) => a - b);
+  const firstIndex = sortedIndexes[0];
+  const lastIndex = sortedIndexes[sortedIndexes.length - 1];
+
+  const startTime = HOURS[firstIndex];
+  const endTime = HOURS[lastIndex + 1];
+
+  // Locate the specific timeslot by phase
+  const slotIndex = availabilityDoc.timeslots.findIndex(
+    (s) => s.phase === phase,
+  );
+
+  if (slotIndex !== -1) {
+    // Case A: Slot exists
+    const slotToUpdate = availabilityDoc.timeslots[slotIndex];
+
+    // Prevent edit if there is already an appointment
+    if (slotToUpdate.isBooked) {
+      throw createHttpError(
+        "Cannot edit a timeslot that is already booked",
+        400,
+      );
+    }
+
+    // Apply change to the specific subdocument
+    availabilityDoc.timeslots[slotIndex].startTime = startTime;
+    availabilityDoc.timeslots[slotIndex].endTime = endTime;
+  } else {
+    // Case B: Slot does NOT exist
+    if (availabilityDoc.timeslots.length >= 2) {
+      throw createHttpError("Maximum 2 slots allowed", 400);
+    }
+
+    // Prevent duplicate phase (already handled by slotIndex === -1 check, but good to be explicit based on your prompt requirements)
+    const exists = availabilityDoc.timeslots.some((s) => s.phase === phase);
+    if (exists) {
+      throw createHttpError("Phase already exists", 400);
+    }
+
+    availabilityDoc.timeslots.push({
+      startTime,
+      endTime,
+      phase,
+      isBooked: false,
+    });
+  }
+
+  await availabilityDoc.save();
+
+  return availabilityDoc;
+};
+
+export const deleteAvailabilityTimeslotService = async (
+  doctorId,
+  date,
+  phase,
+) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const targetDate = new Date(date);
+  targetDate.setHours(0, 0, 0, 0);
+
+  if (targetDate < today) {
+    throw createHttpError("Cannot delete past availability", 400);
+  }
+  // Validate phase
+  if (!["morning", "evening"].includes(phase)) {
+    throw createHttpError("Invalid phase", 400);
+  }
+
+  // Find availability document
+  const availabilityDoc = await findAvailabilityByDoctorAndDate(doctorId, date);
+  if (!availabilityDoc) {
+    throw createHttpError("Availability not found", 404);
+  }
+
+  // Find slot by phase
+  const slotIndex = availabilityDoc.timeslots.findIndex(
+    (s) => s.phase === phase,
+  );
+
+  if (slotIndex === -1) {
+    throw createHttpError("Slot not found for this phase", 404);
+  }
+
+  // Check if booked
+  const slot = availabilityDoc.timeslots[slotIndex];
+  if (slot.isBooked) {
+    throw createHttpError("Cannot delete booked slot", 400);
+  }
+
+  // Remove slot
+  availabilityDoc.timeslots.splice(slotIndex, 1);
+
+  // Save changes
+  await availabilityDoc.save();
+
+  return availabilityDoc;
+};
