@@ -31,3 +31,17 @@ export const findActiveBookingsForDoctorOnDate = (doctorId, dateStr) => {
   }).select('timeSlot');
 };
 
+// ─── Single-slot conflict check (double-booking prevention) ──────────────────
+// Returns the conflicting appointment document if slot is taken, null if free.
+export const findActiveBookingForSlot = (doctorId, dateStr, timeSlot) => {
+  const start = new Date(`${dateStr}T00:00:00.000Z`);
+  const end   = new Date(`${dateStr}T23:59:59.999Z`);
+  return AppointmentModel.findOne({
+    doctorId,
+    date:     { $gte: start, $lte: end },
+    timeSlot,
+    status:   { $in: ['pending', 'confirmed'] },
+  });
+};
+
+
