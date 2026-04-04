@@ -16,6 +16,7 @@ import { authRouter } from "./auth.routes.js";
 import { patientRouter } from "./patient.routes.js";
 import { doctorRouter } from "./doctor.routes.js";
 import { availabilityRouter } from "./availability.routes.js";
+import { appointmentRouter } from "./appointment.routes.js";
 
 const router = Router();
 
@@ -23,5 +24,6 @@ router.use(authRouter);
 router.use(patientRouter);
 router.use(doctorRouter);
 router.use(availabilityRouter);
+router.use(appointmentRouter);
 
 export default router;
