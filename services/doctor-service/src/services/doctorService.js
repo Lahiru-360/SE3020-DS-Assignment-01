@@ -6,6 +6,7 @@ import {
   findPendingDoctors,
   approveDoctorByUserId,
   deleteDoctorByUserId,
+  searchDoctors,
 } from "../repositories/doctorRepository.js";
 import { createHttpError } from "../utils/httpError.js";
 
@@ -96,6 +97,15 @@ export const updateDoctorProfileService = async (userId, updateData) => {
 
   return updatedDoctor;
 };
+
+// ─── Internal lookup (called by appointment-service) ─────────────────────────
+
+export const getDoctorByUserIdService = async (userId) => {
+  const doctor = await findDoctorByUserId(userId);
+  if (!doctor) throw createHttpError('Doctor profile not found', 404);
+  return doctor;
+};
+
 // ─── Internal admin service functions ─────────────────────────────────────
 
 export const getPendingDoctorsService = () => findPendingDoctors();
@@ -110,4 +120,15 @@ export const deleteDoctorProfileService = async (userId) => {
   const result = await deleteDoctorByUserId(userId);
   if (result.deletedCount === 0)
     throw createHttpError("Doctor profile not found", 404);
+};
+
+// ─── Internal search (called by appointment-service) ─────────────────────────
+
+export const searchDoctorsService = async ({ specialization, name } = {}) => {
+  if (!specialization && !name) {
+    throw createHttpError('At least one search filter (specialization or name) is required', 400);
+  }
+
+  const doctors = await searchDoctors({ specialization, name });
+  return doctors;
 };

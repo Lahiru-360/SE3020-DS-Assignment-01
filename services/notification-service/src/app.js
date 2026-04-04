@@ -7,8 +7,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 
 import { connectDB } from './config/db.js';
-import patientRoutes from './routes/patientRoutes.js';
-import medicalReportRoutes from './routes/medicalReportRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 connectDB();
@@ -21,18 +20,17 @@ app.use(morgan('dev'));
 app.use(express.json());
 
 app.get('/health', (req, res) => {
-  res.json({ success: true, message: 'Patient Service running', data: null });
+  res.json({ success: true, message: 'Notification Service running', data: null });
 });
 
-app.use('/api/patients', patientRoutes);
-app.use('/api/patients', medicalReportRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use(errorHandler);
 
 const PORT = process.env.PORT;
 
 app.listen(PORT, () => {
-  console.log(`Patient Service running on port ${PORT}`);
+  console.log(`Notification Service running on port ${PORT}`);
 });
 
 export default app;

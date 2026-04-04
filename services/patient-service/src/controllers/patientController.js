@@ -1,5 +1,5 @@
 import { validationResult } from 'express-validator';
-import { createPatientProfileService, updatePatientProfileService } from '../services/patientService.js';
+import { createPatientProfileService, getPatientByUserIdService, updatePatientProfileService } from '../services/patientService.js';
 import { sendSuccess, sendError } from '../utils/responseHelper.js';
 
 export const createProfile = async (req, res, next) => {
@@ -8,6 +8,16 @@ export const createProfile = async (req, res, next) => {
     if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
     const patient = await createPatientProfileService(req.body);
     return sendSuccess(res, patient, 'Patient profile created', 201);
+  } catch (e) {
+    next(e);
+  }
+};
+
+// ─── Internal lookup (called by appointment-service) ──────────────────────
+export const getPatientInternal = async (req, res, next) => {
+  try {
+    const patient = await getPatientByUserIdService(req.params.userId);
+    return sendSuccess(res, patient, 'Patient profile retrieved');
   } catch (e) {
     next(e);
   }

@@ -1,5 +1,5 @@
 {
-  "name": "patient-service",
+  "name": "notification-service",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -7,15 +7,15 @@
     "dev": "nodemon src/app.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.43.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.6.1",
     "express": "^4.19.2",
     "express-validator": "^7.1.0",
     "helmet": "^7.1.0",
     "mongoose": "^8.4.1",
     "morgan": "^1.10.0",
-    "multer": "^2.1.1"
+    "nodemailer": "^6.9.14",
+    "twilio": "^5.13.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

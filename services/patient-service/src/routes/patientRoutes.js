@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────────
 
 import { Router } from 'express';
-import { createProfile, updateProfile } from '../controllers/patientController.js';
+import { createProfile, getPatientInternal, updateProfile } from '../controllers/patientController.js';
 import {
   createPatientProfileValidators,
   updatePatientProfileValidators,
@@ -21,6 +21,9 @@ const router = Router();
 
 // ── Internal (auth-service only) ──────────────────────────────────
 router.post('/profile', requireInternalSecret, createPatientProfileValidators, createProfile);
+
+// ── Internal lookup (appointment-service) ──────────────────────────
+router.get('/internal/:userId', requireInternalSecret, getPatientInternal);
 
 // ── Patient-facing (via API Gateway) ──────────────────────────────
 router.patch('/me', updatePatientProfileValidators, updateProfile);
