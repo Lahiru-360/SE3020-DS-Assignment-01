@@ -27,6 +27,16 @@ export const updateProfile = async (req, res, next) => {
     if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
 
     const { userId } = req.params;
+    const authenticatedUserId = req.headers["x-user-id"];
+
+    if (!authenticatedUserId || authenticatedUserId !== userId) {
+      return sendError(
+        res,
+        "Forbidden: you can only update your own profile",
+        403,
+      );
+    }
+
     const doctor = await updateDoctorProfileService(userId, req.body);
     return sendSuccess(res, doctor, "Doctor profile updated successfully", 200);
   } catch (e) {

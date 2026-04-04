@@ -43,6 +43,11 @@ const DoctorSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    consultationFee: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
     isApproved: {
       type: Boolean,
       default: false,
