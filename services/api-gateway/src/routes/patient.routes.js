@@ -1,11 +1,3 @@
-// ─────────────────────────────────────────────────────
-// Patient Service Routes — API Gateway
-//
-// PATCH /api/patients/me — authenticated patients only.
-//   Requires a valid JWT. Role must be 'patient'.
-//   Checked at the gateway before forwarding.
-// ─────────────────────────────────────────────────────
-
 import { Router } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { config } from '../config/index.js';

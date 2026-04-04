@@ -8,6 +8,7 @@ import morgan from 'morgan';
 
 import { connectDB } from './config/db.js';
 import patientRoutes from './routes/patientRoutes.js';
+import medicalReportRoutes from './routes/medicalReportRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 connectDB();
@@ -24,6 +25,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/patients', patientRoutes);
+app.use('/api/patients', medicalReportRoutes);
 
 app.use(errorHandler);
 
