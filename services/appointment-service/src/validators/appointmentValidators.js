@@ -6,9 +6,8 @@ export const bookAppointmentValidators = [
     .notEmpty().withMessage('doctorId is required'),
   body('date')
     .isISO8601().withMessage('A valid date (ISO 8601) is required'),
-  body('timeSlot')
-    .trim()
-    .notEmpty().withMessage('timeSlot is required'),
+  body('phase')
+    .isIn(['morning', 'evening']).withMessage('phase must be morning or evening'),
   body('notes')
     .optional()
     .trim()
@@ -31,12 +30,3 @@ export const searchDoctorsValidators = [
     .trim()
     .notEmpty().withMessage('name cannot be blank'),
 ];
-
-export const getAvailableSlotsValidators = [
-  query('doctorId')
-    .trim()
-    .notEmpty().withMessage('doctorId is required'),
-  query('date')
-    .matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('date must be in YYYY-MM-DD format'),
-];
-

@@ -2,11 +2,11 @@
 // Appointment Service Routes — API Gateway
 //
 // Routes and their role requirements:
-//   POST   /api/appointments          → patient only (book)
-//   GET    /api/appointments/my       → patient only (view own)
-//   GET    /api/appointments/doctor   → doctor only (view assigned)
-//   PATCH  /api/appointments/:id/status → doctor only (confirm/complete)
-//   PATCH  /api/appointments/:id/cancel → patient or doctor (cancel)
+//   POST   /api/appointments              → patient only (book with phase)
+//   GET    /api/appointments/my           → patient only (view own)
+//   GET    /api/appointments/doctor       → doctor only (view assigned)
+//   PATCH  /api/appointments/:id/status   → doctor only (confirm/complete)
+//   PATCH  /api/appointments/:id/cancel   → patient or doctor (cancel)
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Router } from 'express';
@@ -22,7 +22,6 @@ router.use('/api/appointments', verifyToken);
 // ── Role-specific guards ───────────────────────────────────────────────────
 // These call next() if authorized, allowing the proxy below to forward the request.
 router.get('/api/appointments/doctors/search', requireRole('patient'));
-router.get('/api/appointments/slots',          requireRole('patient'));
 router.post('/api/appointments',              requireRole('patient'));
 router.get('/api/appointments/my',           requireRole('patient'));
 router.get('/api/appointments/doctor',       requireRole('doctor'));

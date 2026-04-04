@@ -20,11 +20,13 @@ const STATUS_TRANSITIONS = {
 const internalHeaders = () => ({ 'x-internal-secret': process.env.INTERNAL_SECRET });
 
 // ─── Book appointment ───────────────────────────────────────────────────────
+// Patient supplies { doctorId, date, phase: "morning"|"evening", notes }.
+// The system auto-assigns the nearest free 20-min slot in that phase (queue).
 export const bookAppointmentService = async ({
   patientId,
   doctorId,
   date,
-  timeSlot,
+  phase,
   notes,
 }) => {
   // 1. Validate doctor exists and is approved (internal call to doctor-service)
@@ -42,46 +44,60 @@ export const bookAppointmentService = async ({
   if (!doctor) throw createHttpError('Doctor not found', 404);
   if (!doctor.isApproved) throw createHttpError('Doctor is not approved yet', 400);
 
-  // 2. Normalise date to "YYYY-MM-DD" (input may be "2026-04-05" or full ISO8601)
-  //    new Date("YYYY-MM-DD") parses as UTC midnight — consistent with storage.
+  // 2. Normalise date to "YYYY-MM-DD"
   const dateStr = new Date(date).toISOString().slice(0, 10);
 
-  // 3. Fetch doctor's availability for this date (shared helper)
+  // 3. Fetch doctor's availability for this date
   const availForDate = await fetchAvailabilityForDate(doctorId, dateStr);
   if (!availForDate || !availForDate.timeslots?.length) {
     throw createHttpError('Doctor has no availability on this date', 400);
   }
 
-  // 4. Validate that the requested timeSlot lands on a valid 20-min boundary
-  const allSlots = [];
-  for (const ts of availForDate.timeslots) {
-    allSlots.push(...generateSubSlots(ts.startTime, ts.endTime));
-  }
-  if (!allSlots.includes(timeSlot)) {
+  // 4. Find the timeslot block that matches the requested phase
+  const phaseBlock = availForDate.timeslots.find((ts) => ts.phase === phase);
+  if (!phaseBlock) {
     throw createHttpError(
-      `Invalid time slot "${timeSlot}". Valid slots on this date: ${allSlots.join(', ')}`,
+      `Doctor has no ${phase} session on this date`,
       400
     );
   }
 
-  // 5. Check for an existing active booking on this exact slot (prevent double-booking)
-  const conflict = await findActiveBookingForSlot(doctorId, dateStr, timeSlot);
-  if (conflict) {
-    throw createHttpError('This time slot is already booked', 409);
+  // 5. Generate all 20-min sub-slots for that phase block
+  const allSlots = generateSubSlots(phaseBlock.startTime, phaseBlock.endTime);
+
+  // 6. Fetch all active bookings for this doctor on this date
+  const bookings = await findActiveBookingsForDoctorOnDate(doctorId, dateStr);
+  const bookedSet = new Set(bookings.map((b) => b.timeSlot));
+
+  // 7. Queue: pick the first slot not yet booked
+  const assignedSlot = allSlots.find((s) => !bookedSet.has(s));
+  if (!assignedSlot) {
+    throw createHttpError(
+      `No available slots for the ${phase} session on this date`,
+      409
+    );
   }
 
-  // 6. Store minimal references + scheduling data — no personal details.
-  //    Use UTC midnight so the date is consistent with all query boundaries.
+  // 8. Double-booking guard (race-condition safety)
+  const conflict = await findActiveBookingForSlot(doctorId, dateStr, assignedSlot);
+  if (conflict) {
+    throw createHttpError(
+      `No available slots for the ${phase} session on this date`,
+      409
+    );
+  }
+
+  // 9. Persist the appointment with the auto-assigned slot
   const appointment = await createAppointment({
     patientId,
     doctorId,
     date:    new Date(`${dateStr}T00:00:00.000Z`),
-    timeSlot,
+    timeSlot: assignedSlot,
     notes:   notes || null,
     status:  'pending',
   });
 
-  // 7. Fire-and-forget notifications to both parties
+  // 10. Fire-and-forget notifications to both parties
   notifyBoth('appointment_booked', appointment).catch(() => {});
 
   return appointment;
@@ -140,6 +156,19 @@ export const updateAppointmentStatusService = async (appointmentId, doctorId, ne
   return updated;
 };
 
+// ─── Search doctors by specialization / name ───────────────────────────────
+export const searchDoctorsService = async ({ specialization, name }) => {
+  const params = new URLSearchParams();
+  if (specialization) params.append('specialization', specialization);
+  if (name)           params.append('name', name);
+
+  const { data } = await axios.get(
+    `${process.env.DOCTOR_SERVICE_URL}/api/doctors/internal/search?${params}`,
+    { headers: internalHeaders() }
+  );
+  return data.data;
+};
+
 // ─── Fetch patient details from patient-service ─────────────────────────────
 async function fetchPatient(patientId) {
   try {
@@ -167,7 +196,6 @@ async function fetchDoctor(doctorId) {
 }
 
 // ─── Send notification to patient and doctor ───────────────────────────────
-// Fetches personal details on-demand — no personal data stored in appointment.
 async function notifyBoth(type, appt) {
   const [patient, doctor] = await Promise.all([
     fetchPatient(appt.patientId),
@@ -214,7 +242,7 @@ async function notifyBoth(type, appt) {
 
 // ─── Helper: generate 20-min (configurable) sub-slots from a time range ────
 // startTime and endTime are "HH:mm" strings.
-// Returns an array of "HH:mm" strings: ["09:00", "09:20", ...]
+// Returns an array of "HH:mm" start times: ["09:00", "09:20", ...]
 function generateSubSlots(startTime, endTime) {
   const slotMinutes = parseInt(process.env.SLOT_DURATION_MINUTES, 10) || 20;
 
@@ -233,10 +261,8 @@ function generateSubSlots(startTime, endTime) {
   return slots;
 }
 
-// ─── Helper: fetch the availability document for a doctor on a specific date ─
+// ─── Helper: fetch availability document for a doctor on a specific date ───
 // dateStr must be "YYYY-MM-DD". Returns the matching availability doc or null.
-// Shared by bookAppointmentService and getAvailableSlotsService to avoid
-// duplicating the axios call + date-filter logic.
 async function fetchAvailabilityForDate(doctorId, dateStr) {
   try {
     const { data } = await axios.get(
@@ -249,42 +275,3 @@ async function fetchAvailabilityForDate(doctorId, dateStr) {
     throw createHttpError('Could not fetch doctor availability', 502);
   }
 }
-
-// ─── Search doctors by specialization / name ───────────────────────────────
-export const searchDoctorsService = async ({ specialization, name }) => {
-  const params = new URLSearchParams();
-  if (specialization) params.append('specialization', specialization);
-  if (name)           params.append('name', name);
-
-  const { data } = await axios.get(
-    `${process.env.DOCTOR_SERVICE_URL}/api/doctors/internal/search?${params}`,
-    { headers: internalHeaders() }
-  );
-  return data.data;
-};
-
-// ─── Get available 20-min slots for a doctor on a date ────────────────────
-export const getAvailableSlotsService = async ({ doctorId, date }) => {
-  // Normalise date to "YYYY-MM-DD" (may arrive as string or Date object)
-  const dateStr = typeof date === 'string' ? date : new Date(date).toISOString().slice(0, 10);
-
-  // Fetch and filter availability via shared helper
-  const availForDate = await fetchAvailabilityForDate(doctorId, dateStr);
-
-  if (!availForDate || !availForDate.timeslots?.length) {
-    return { date: dateStr, availableSlots: [] };
-  }
-
-  // Generate all possible 20-min sub-slots from doctor's time ranges
-  const allSlots = [];
-  for (const ts of availForDate.timeslots) {
-    allSlots.push(...generateSubSlots(ts.startTime, ts.endTime));
-  }
-
-  // Subtract already-booked slots
-  const bookings = await findActiveBookingsForDoctorOnDate(doctorId, dateStr);
-  const bookedSet = new Set(bookings.map((b) => b.timeSlot));
-  const availableSlots = allSlots.filter((s) => !bookedSet.has(s));
-
-  return { date: dateStr, availableSlots };
-};

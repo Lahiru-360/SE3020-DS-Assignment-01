@@ -6,7 +6,6 @@ import {
   cancelAppointmentService,
   updateAppointmentStatusService,
   searchDoctorsService,
-  getAvailableSlotsService,
 } from '../services/appointmentService.js';
 import { sendSuccess, sendError } from '../utils/responseHelper.js';
 
@@ -19,13 +18,13 @@ export const bookAppointment = async (req, res, next) => {
     const patientId = req.headers['x-user-id'];
     if (!patientId) return sendError(res, 'Unauthorized', 401);
 
-    const { doctorId, date, timeSlot, notes } = req.body;
+    const { doctorId, date, phase, notes } = req.body;
 
     const appointment = await bookAppointmentService({
       patientId,
       doctorId,
       date,
-      timeSlot,
+      phase,
       notes,
     });
 
@@ -101,20 +100,6 @@ export const searchDoctors = async (req, res, next) => {
     const { specialization, name } = req.query;
     const doctors = await searchDoctorsService({ specialization, name });
     return sendSuccess(res, doctors, 'Doctors retrieved');
-  } catch (e) {
-    next(e);
-  }
-};
-
-// GET /api/appointments/slots — patient views available 20-min slots for a doctor on a date
-export const getAvailableSlots = async (req, res, next) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
-
-    const { doctorId, date } = req.query;
-    const result = await getAvailableSlotsService({ doctorId, date });
-    return sendSuccess(res, result, 'Available slots retrieved');
   } catch (e) {
     next(e);
   }
