@@ -20,3 +20,25 @@ export const approveDoctorByUserId = (userId) =>
 
 export const deleteDoctorByUserId = (userId) =>
   DoctorModel.deleteOne({ userId });
+
+// ─── Internal search (called by appointment-service) ─────────────────────────
+export const searchDoctors = ({ specialization, name } = {}) => {
+  const filter = { isApproved: true };
+
+  if (specialization) {
+    filter.specialization = { $regex: specialization, $options: 'i' };
+  }
+
+  if (name) {
+    const nameRegex = { $regex: name, $options: 'i' };
+    filter.$or = [{ firstName: nameRegex }, { lastName: nameRegex }];
+  }
+
+  return DoctorModel.find(filter, {
+    userId: 1,
+    firstName: 1,
+    lastName: 1,
+    specialization: 1,
+    phone: 1,
+  });
+};
