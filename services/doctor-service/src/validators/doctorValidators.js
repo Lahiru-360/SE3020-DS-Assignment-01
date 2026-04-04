@@ -36,6 +36,12 @@ export const createDoctorProfileValidators = [
     .withMessage("License number must not exceed 50 characters")
     .matches(/^[a-zA-Z0-9\-/]+$/)
     .withMessage("License number must be alphanumeric"),
+  body("consultationFee")
+    .notEmpty()
+    .withMessage("Consultation fee is required")
+    .isFloat({ min: 0 })
+    .withMessage("Consultation fee must be a number greater than or equal to 0")
+    .toFloat(),
 ];
 
 export const updateDoctorProfileValidators = [
@@ -84,4 +90,9 @@ export const updateDoctorProfileValidators = [
     .withMessage("License number must not exceed 50 characters")
     .matches(/^[a-zA-Z0-9\-/]+$/)
     .withMessage("License number must be alphanumeric"),
+  body("consultationFee")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Consultation fee must be a number greater than or equal to 0")
+    .toFloat(),
 ];

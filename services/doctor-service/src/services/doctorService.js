@@ -9,6 +9,16 @@ import {
 } from "../repositories/doctorRepository.js";
 import { createHttpError } from "../utils/httpError.js";
 
+const normalizeConsultationFee = (value) => {
+  if (value === "" || value === null || value === undefined) return null;
+
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+const isValidConsultationFee = (value) =>
+  typeof value === "number" && value > 0 && value <= 10000;
+
 export const createDoctorProfileService = async ({
   userId,
   email,
@@ -17,7 +27,17 @@ export const createDoctorProfileService = async ({
   phone,
   specialization,
   licenseNumber,
+  consultationFee,
 }) => {
+  const fee = normalizeConsultationFee(consultationFee);
+
+  if (!isValidConsultationFee(fee)) {
+    throw createHttpError(
+      "Consultation fee must be a number between 0 and 10,000 LKR",
+      400,
+    );
+  }
+
   const existingByUser = await findDoctorByUserId(userId);
   if (existingByUser)
     throw createHttpError("Doctor profile already exists for this user", 409);
@@ -34,6 +54,7 @@ export const createDoctorProfileService = async ({
     phone,
     specialization,
     licenseNumber,
+    consultationFee: fee,
   });
 
   return doctor;
@@ -42,6 +63,19 @@ export const createDoctorProfileService = async ({
 export const updateDoctorProfileService = async (userId, updateData) => {
   if (Object.keys(updateData).length === 0) {
     throw createHttpError("No fields provided to update", 400);
+  }
+
+  if (updateData.consultationFee !== undefined) {
+    const fee = normalizeConsultationFee(updateData.consultationFee);
+
+    if (!isValidConsultationFee(fee)) {
+      throw createHttpError(
+        "Consultation fee must be a number between 0 and 10,000 LKR",
+        400,
+      );
+    }
+
+    updateData.consultationFee = fee;
   }
 
   // If updating license, make sure it's not taken by another doctor
