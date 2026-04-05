@@ -51,6 +51,22 @@ const AppointmentSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    // ── Cancellation & Refund Tracking ─────────────────────────────────────
+    // Tracks who cancelled and why (for audit trail and analytics)
+    cancelledBy: {
+      type: String,
+      enum: ['patient', 'doctor'],
+      default: null,
+    },
+    cancellationReason: {
+      type: String,
+      default: null,
+      // Examples: "Won't attend", "Doctor unavailable", "Technical issue", etc.
+    },
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

@@ -68,8 +68,15 @@ export const cancelAppointment = async (req, res, next) => {
     const role   = req.headers['x-user-role'];
     if (!userId) return sendError(res, 'Unauthorized', 401);
 
-    const appointment = await cancelAppointmentService(req.params.id, userId, role);
-    return sendSuccess(res, appointment, 'Appointment cancelled');
+    const { reason } = req.body;  // Extract reason from request body
+
+    const appointment = await cancelAppointmentService(
+      req.params.id, 
+      userId, 
+      role, 
+      reason  // Pass reason to service
+    );
+    return sendSuccess(res, appointment, 'Appointment cancelled and refund processed');
   } catch (e) {
     next(e);
   }

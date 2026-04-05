@@ -155,7 +155,7 @@ export const getDoctorAppointmentsService = (doctorId) =>
 // After updating the appointment status to 'cancelled', a refund is requested
 // from the payment-service (fire-and-forget). The payment-service will push
 // the final paymentStatus back via the internal webhook.
-export const cancelAppointmentService = async (appointmentId, userId, role) => {
+export const cancelAppointmentService = async (appointmentId, userId, role, reason = null) => {
   const appt = await findAppointmentById(appointmentId);
   if (!appt) throw createHttpError('Appointment not found', 404);
 
@@ -166,7 +166,13 @@ export const cancelAppointmentService = async (appointmentId, userId, role) => {
     throw createHttpError(`Cannot cancel a ${appt.status} appointment`, 400);
   }
 
-  const updated = await updateAppointmentById(appointmentId, { status: 'cancelled' });
+  // Update appointment with cancellation details
+  const updated = await updateAppointmentById(appointmentId, { 
+    status: 'cancelled',
+    cancelledBy: role,                    // 'patient' or 'doctor'
+    cancellationReason: reason,           // User-provided reason
+    cancelledAt: new Date(),              // Timestamp of cancellation
+  });
 
   // Fire-and-forget refund — payment-service will issue the Stripe refund and
   // push the confirmed 'refunded' paymentStatus back via internal webhook.
