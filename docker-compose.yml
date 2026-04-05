@@ -129,6 +129,7 @@ services:
       - doctor-service
       - patient-service
       - notification-service
+      - payment-service
     volumes:
       - ./services/appointment-service:/app
       - /app/node_modules
@@ -137,30 +138,29 @@ services:
     # NOT exposed to the host — all traffic must go through the gateway
 
   # ── Payment Service ───────────────────────────────────────────────────────
-  # Uncomment this block when payment-service is ready. Port: 5005.
-  # payment-service:
-  #   build:
-  #     context: ./services/payment-service
-  #     dockerfile: Dockerfile
-  #   container_name: hc-payment-service
-  #   restart: unless-stopped
-  #   env_file:
-  #     - ./services/payment-service/.env.example
-  #   environment:
-  #     PORT: 5005
-  #     MONGO_URI: mongodb://mongo:27017/payment-service
-  #     INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
-  #     STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_...}
-  #     STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_...}
-  #     APPOINTMENT_SERVICE_URL: http://appointment-service:5003
-  #   depends_on:
-  #     - mongo
-  #   volumes:
-  #     - ./services/payment-service:/app
-  #     - /app/node_modules
-  #   networks:
-  #     - hc-network
-  #   # NOT exposed to the host — all traffic must go through the gateway
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: hc-payment-service
+    restart: unless-stopped
+    env_file:
+      - ./services/payment-service/.env.example
+    environment:
+      PORT: 5005
+      MONGO_URI: mongodb://mongo:27017/payment-service
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_...}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_test_local}
+      APPOINTMENT_SERVICE_URL: http://appointment-service:5003
+    depends_on:
+      - mongo
+    volumes:
+      - ./services/payment-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+    # NOT exposed to the host — all traffic must go through the gateway
 
   # ── Notification Service ──────────────────────────────────────
   notification-service:

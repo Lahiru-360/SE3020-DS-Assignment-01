@@ -8,6 +8,7 @@ import {
   deleteAppointmentById,
   findActiveBookingsForDoctorOnDate,
   findActiveBookingForSlot,
+  findAppointmentByIntentId,
 } from '../repositories/appointmentRepository.js';
 import { createHttpError } from '../utils/httpError.js';
 import { initiatePayment, requestRefund } from '../utils/paymentClient.js';
@@ -123,10 +124,11 @@ export const bookAppointmentService = async ({
     throw createHttpError('Payment service unavailable. Please try again.', 502);
   }
 
-  // 11. Stamp the appointment with the PaymentIntent reference
+  // 11. Stamp the appointment with the PaymentIntent reference and consultation fee
   const finalAppointment = await updateAppointmentById(appointment._id, {
     paymentIntentId: paymentData.paymentIntentId,
     paymentStatus:   'pending',
+    consultationFee: amount,  // Store fee snapshot from doctor profile
   });
 
   // 12. Fire-and-forget notifications to both parties

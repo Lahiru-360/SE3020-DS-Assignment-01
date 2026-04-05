@@ -45,6 +45,12 @@ const AppointmentSchema = new mongoose.Schema(
       enum: ['pending', 'completed', 'failed', 'refunded'],
       default: 'pending',
     },
+    // Consultation fee snapshot from doctor profile at booking time (in cents/LKR smallest unit)
+    // Stored for display on confirmation page and refund reference
+    consultationFee: {
+      type: Number,
+      default: null,
+    },
   },
   { timestamps: true }
 );

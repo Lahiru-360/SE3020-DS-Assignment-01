@@ -47,4 +47,9 @@ export const findActiveBookingForSlot = (doctorId, dateStr, timeSlot) => {
   });
 };
 
+// ─── Find appointment by payment intent ID (for webhook sync) ─────────────────
+// Called by payment-service webhook to sync payment status back to appointment
+export const findAppointmentByIntentId = (paymentIntentId) =>
+  AppointmentModel.findOne({ paymentIntentId });
+
 
