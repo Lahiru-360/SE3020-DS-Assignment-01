@@ -16,6 +16,7 @@ import {
   getDoctorAppointments,
   cancelAppointment,
   updateAppointmentStatus,
+  updatePaymentStatus,
   searchDoctors,
 } from '../controllers/appointmentController.js';
 import {
@@ -23,8 +24,14 @@ import {
   updateStatusValidators,
   searchDoctorsValidators,
 } from '../validators/appointmentValidators.js';
+import { internalAuth } from '../middleware/internalAuth.js';
 
 const router = Router();
+
+// ── Internal (service-to-service) ────────────────────────────────────────────
+// Called by payment-service after Stripe confirms / fails a charge.
+// Protected by internalAuth — NOT forwarded by the API gateway.
+router.patch('/internal/payment-status', internalAuth, updatePaymentStatus);
 
 // ── Patient-facing ────────────────────────────────────────────────────────────
 router.get('/doctors/search', searchDoctorsValidators, searchDoctors);

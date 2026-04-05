@@ -5,10 +5,12 @@ import {
   findAppointmentsByPatientId,
   findAppointmentsByDoctorId,
   updateAppointmentById,
+  deleteAppointmentById,
   findActiveBookingsForDoctorOnDate,
   findActiveBookingForSlot,
 } from '../repositories/appointmentRepository.js';
 import { createHttpError } from '../utils/httpError.js';
+import { initiatePayment, requestRefund } from '../utils/paymentClient.js';
 
 // ─── Allowed status transitions ────────────────────────────────────────────
 const STATUS_TRANSITIONS = {
@@ -22,6 +24,9 @@ const internalHeaders = () => ({ 'x-internal-secret': process.env.INTERNAL_SECRE
 // ─── Book appointment ───────────────────────────────────────────────────────
 // Patient supplies { doctorId, date, phase: "morning"|"evening", notes }.
 // The system auto-assigns the nearest free 20-min slot in that phase (queue).
+// After the appointment is persisted, a Stripe PaymentIntent is initiated via
+// the payment-service. If payment initiation fails the appointment is deleted
+// (rolled back) so the DB never holds an orphaned un-payable record.
 export const bookAppointmentService = async ({
   patientId,
   doctorId,
@@ -91,16 +96,49 @@ export const bookAppointmentService = async ({
   const appointment = await createAppointment({
     patientId,
     doctorId,
-    date:    new Date(`${dateStr}T00:00:00.000Z`),
+    date:     new Date(`${dateStr}T00:00:00.000Z`),
     timeSlot: assignedSlot,
-    notes:   notes || null,
-    status:  'pending',
+    notes:    notes || null,
+    status:   'pending',
   });
 
-  // 10. Fire-and-forget notifications to both parties
-  notifyBoth('appointment_booked', appointment).catch(() => {});
+  // 10. Initiate payment via payment-service
+  // consultationFee from doctor profile is already in smallest currency unit (e.g. cents).
+  const amount   = doctor.consultationFee;
+  const currency = process.env.PAYMENT_CURRENCY || 'lkr';
 
-  return appointment;
+  let paymentData;
+  try {
+    paymentData = await initiatePayment({
+      appointmentId: appointment._id.toString(),
+      patientId,
+      doctorId,
+      amount,
+      currency,
+      description: `Consultation with Dr. ${doctor.firstName} ${doctor.lastName} on ${dateStr}`,
+    });
+  } catch {
+    // Payment initiation failed — roll back the appointment to keep DB consistent
+    await deleteAppointmentById(appointment._id);
+    throw createHttpError('Payment service unavailable. Please try again.', 502);
+  }
+
+  // 11. Stamp the appointment with the PaymentIntent reference
+  const finalAppointment = await updateAppointmentById(appointment._id, {
+    paymentIntentId: paymentData.paymentIntentId,
+    paymentStatus:   'pending',
+  });
+
+  // 12. Fire-and-forget notifications to both parties
+  notifyBoth('appointment_booked', finalAppointment).catch(() => {});
+
+  // Return the full appointment + stripeClientSecret so the frontend can
+  // call Stripe.js to complete the payment. stripeClientSecret is NOT stored
+  // in the DB (matches payment-service design — only exposed at creation time).
+  return {
+    ...finalAppointment.toObject(),
+    stripeClientSecret: paymentData.stripeClientSecret,
+  };
 };
 
 // ─── Get patient's own appointments ────────────────────────────────────────
@@ -112,6 +150,9 @@ export const getDoctorAppointmentsService = (doctorId) =>
   findAppointmentsByDoctorId(doctorId);
 
 // ─── Cancel appointment (patient or doctor) ─────────────────────────────────
+// After updating the appointment status to 'cancelled', a refund is requested
+// from the payment-service (fire-and-forget). The payment-service will push
+// the final paymentStatus back via the internal webhook.
 export const cancelAppointmentService = async (appointmentId, userId, role) => {
   const appt = await findAppointmentById(appointmentId);
   if (!appt) throw createHttpError('Appointment not found', 404);
@@ -124,6 +165,10 @@ export const cancelAppointmentService = async (appointmentId, userId, role) => {
   }
 
   const updated = await updateAppointmentById(appointmentId, { status: 'cancelled' });
+
+  // Fire-and-forget refund — payment-service will issue the Stripe refund and
+  // push the confirmed 'refunded' paymentStatus back via internal webhook.
+  requestRefund(appointmentId).catch(() => {});
 
   notifyBoth('appointment_cancelled', updated).catch(() => {});
 
@@ -152,6 +197,41 @@ export const updateAppointmentStatusService = async (appointmentId, doctorId, ne
     cancelled:  'appointment_cancelled',
   };
   notifyBoth(notifTypeMap[newStatus], updated).catch(() => {});
+
+  // If the doctor cancels, also fire a refund
+  if (newStatus === 'cancelled') {
+    requestRefund(appointmentId).catch(() => {});
+  }
+
+  return updated;
+};
+
+// ─── Update paymentStatus (called by payment-service internal webhook) ───────
+// Accepts paymentStatus values that mirror the payment-service's PaymentModel enum.
+// If Stripe reports 'failed', the appointment is also auto-cancelled so that the
+// slot is released and the patient is notified.
+export const updatePaymentStatusService = async (appointmentId, paymentStatus) => {
+  const VALID_PAYMENT_STATUSES = ['pending', 'completed', 'failed', 'refunded'];
+  if (!VALID_PAYMENT_STATUSES.includes(paymentStatus)) {
+    throw createHttpError(`Invalid payment status: ${paymentStatus}`, 400);
+  }
+
+  const appt = await findAppointmentById(appointmentId);
+  if (!appt) throw createHttpError('Appointment not found', 404);
+
+  const updates = { paymentStatus };
+
+  // Auto-cancel the appointment when Stripe payment fails so the slot is freed
+  if (paymentStatus === 'failed' && STATUS_TRANSITIONS[appt.status]) {
+    updates.status = 'cancelled';
+  }
+
+  const updated = await updateAppointmentById(appointmentId, updates);
+
+  // Notify both parties when payment failure forces a cancellation
+  if (updates.status === 'cancelled') {
+    notifyBoth('appointment_cancelled', updated).catch(() => {});
+  }
 
   return updated;
 };
@@ -214,9 +294,9 @@ async function notifyBoth(type, appt) {
     patientName,
     doctorName,
     specialty,
-    date:     appt.date,
-    timeSlot: appt.timeSlot,
-    status:   appt.status,
+    date:          appt.date,
+    timeSlot:      appt.timeSlot,
+    status:        appt.status,
   };
 
   const recipients = [

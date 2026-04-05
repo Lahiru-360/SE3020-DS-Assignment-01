@@ -13,6 +13,9 @@ export const findAppointmentsByDoctorId = (doctorId) =>
 export const updateAppointmentById = (id, updates) =>
   AppointmentModel.findByIdAndUpdate(id, updates, { new: true });
 
+// Used for payment-initiated rollback: delete appointment if payment initiation fails
+export const deleteAppointmentById = (id) => AppointmentModel.findByIdAndDelete(id);
+
 // ─── Active bookings for a doctor on a specific date (for slot computation) ──
 // dateStr must be "YYYY-MM-DD". Queries pending + confirmed only — cancelled/
 // completed appointments do NOT occupy a slot.

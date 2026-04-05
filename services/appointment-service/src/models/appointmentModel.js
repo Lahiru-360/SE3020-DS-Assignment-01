@@ -32,6 +32,19 @@ const AppointmentSchema = new mongoose.Schema(
       trim: true,
       default: null,
     },
+    // ── Payment fields (populated after payment-service initiates a PaymentIntent) ──
+    // paymentIntentId links this record to the payment-service's PaymentModel.
+    // NULL only transiently between createAppointment and initiatePayment calls.
+    paymentIntentId: {
+      type: String,
+      default: null,
+    },
+    // Mirrors payment-service status for quick reads. Updated via internal webhook.
+    paymentStatus: {
+      type: String,
+      enum: ['pending', 'completed', 'failed', 'refunded'],
+      default: 'pending',
+    },
   },
   { timestamps: true }
 );

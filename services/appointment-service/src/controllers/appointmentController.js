@@ -5,6 +5,7 @@ import {
   getDoctorAppointmentsService,
   cancelAppointmentService,
   updateAppointmentStatusService,
+  updatePaymentStatusService,
   searchDoctorsService,
 } from '../services/appointmentService.js';
 import { sendSuccess, sendError } from '../utils/responseHelper.js';
@@ -100,6 +101,22 @@ export const searchDoctors = async (req, res, next) => {
     const { specialization, name } = req.query;
     const doctors = await searchDoctorsService({ specialization, name });
     return sendSuccess(res, doctors, 'Doctors retrieved');
+  } catch (e) {
+    next(e);
+  }
+};
+
+// PATCH /api/appointments/internal/payment-status — called by payment-service
+// Updates the paymentStatus field on an appointment after Stripe confirms/fails a charge.
+// If paymentStatus is 'failed', the service layer auto-cancels the appointment.
+export const updatePaymentStatus = async (req, res, next) => {
+  try {
+    const { appointmentId, paymentStatus } = req.body;
+    if (!appointmentId || !paymentStatus) {
+      return sendError(res, 'appointmentId and paymentStatus are required', 422);
+    }
+    const updated = await updatePaymentStatusService(appointmentId, paymentStatus);
+    return sendSuccess(res, updated, 'Payment status updated');
   } catch (e) {
     next(e);
   }

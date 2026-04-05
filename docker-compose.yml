@@ -121,6 +121,8 @@ services:
       DOCTOR_SERVICE_URL: http://doctor-service:5001
       PATIENT_SERVICE_URL: http://patient-service:5002
       NOTIFICATION_SERVICE_URL: http://notification-service:5004
+      PAYMENT_SERVICE_URL: http://payment-service:5005
+      PAYMENT_CURRENCY: ${PAYMENT_CURRENCY:-lkr}
       SLOT_DURATION_MINUTES: ${SLOT_DURATION_MINUTES:-20}
     depends_on:
       - mongo
@@ -133,6 +135,32 @@ services:
     networks:
       - hc-network
     # NOT exposed to the host — all traffic must go through the gateway
+
+  # ── Payment Service ───────────────────────────────────────────────────────
+  # Uncomment this block when payment-service is ready. Port: 5005.
+  # payment-service:
+  #   build:
+  #     context: ./services/payment-service
+  #     dockerfile: Dockerfile
+  #   container_name: hc-payment-service
+  #   restart: unless-stopped
+  #   env_file:
+  #     - ./services/payment-service/.env.example
+  #   environment:
+  #     PORT: 5005
+  #     MONGO_URI: mongodb://mongo:27017/payment-service
+  #     INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
+  #     STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_...}
+  #     STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_...}
+  #     APPOINTMENT_SERVICE_URL: http://appointment-service:5003
+  #   depends_on:
+  #     - mongo
+  #   volumes:
+  #     - ./services/payment-service:/app
+  #     - /app/node_modules
+  #   networks:
+  #     - hc-network
+  #   # NOT exposed to the host — all traffic must go through the gateway
 
   # ── Notification Service ──────────────────────────────────────
   notification-service:
@@ -147,15 +175,15 @@ services:
       PORT: 5004
       MONGO_URI: mongodb://mongo:27017/notification-service
       INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
-      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
-      EMAIL_PORT: ${EMAIL_PORT:-587}
-      EMAIL_USER: ${EMAIL_USER:-your_email@gmail.com}
-      EMAIL_PASS: ${EMAIL_PASS:-your_app_password}
-      EMAIL_FROM: ${EMAIL_FROM:-HC Platform <no-reply@hcplatform.com>}
-      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
-      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-your_twilio_auth_token}
-      TWILIO_MESSAGING_SERVICE_SID: ${TWILIO_MESSAGING_SERVICE_SID:-MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
-    depends_on:
+    #   EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+    #   EMAIL_PORT: ${EMAIL_PORT:-587}
+    #   EMAIL_USER: ${EMAIL_USER:-your_email@gmail.com}
+    #   EMAIL_PASS: ${EMAIL_PASS:-your_app_password}
+    #   EMAIL_FROM: ${EMAIL_FROM:-HC Platform <no-reply@hcplatform.com>}
+    #   TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+    #   TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-your_twilio_auth_token}
+    #   TWILIO_MESSAGING_SERVICE_SID: ${TWILIO_MESSAGING_SERVICE_SID:-MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+     depends_on:
       - mongo
     volumes:
       - ./services/notification-service:/app
