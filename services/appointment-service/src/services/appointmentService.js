@@ -70,8 +70,33 @@ export const bookAppointmentService = async ({
   const bookings = await findActiveBookingsForDoctorOnDate(doctorId, dateStr);
   const bookedSet = new Set(bookings.map((b) => b.timeSlot));
 
-  // 7. Queue: pick the first slot not yet booked
-  const assignedSlot = allSlots.find((s) => !bookedSet.has(s));
+  // 7. Queue: pick the first slot not yet booked AND not already started (same-day guard)
+  //
+  // When the appointment is for TODAY, we must skip any slot whose window has
+  // already begun — i.e. slotStart <= now.  This ensures a patient booking at
+  // 10:21 is never assigned 10:20 (past) but is moved forward to 10:40.
+  //
+  // Slots are "HH:mm" strings representing the START of a 20-min window.
+  // A slot is "past" when the current wall-clock minute has already reached or
+  // passed that start time, so we require slotStart > nowMinutes.
+  const todayStr = new Date().toISOString().slice(0, 10); // UTC "YYYY-MM-DD"
+  const isToday  = dateStr === todayStr;
+
+  let nowMinutes = 0;
+  if (isToday) {
+    const now = new Date();
+    nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  }
+
+  const assignedSlot = allSlots.find((s) => {
+    if (bookedSet.has(s)) return false;                        // already booked
+    if (isToday) {
+      const [h, m] = s.split(':').map(Number);
+      const slotStart = h * 60 + m;
+      if (slotStart <= nowMinutes) return false;               // slot already started
+    }
+    return true;
+  });
   if (!assignedSlot) {
     throw createHttpError(
       `No available slots for the ${phase} session on this date`,
