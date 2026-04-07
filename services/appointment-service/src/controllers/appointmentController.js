@@ -6,6 +6,7 @@ import {
   cancelAppointmentService,
   updateAppointmentStatusService,
   searchDoctorsService,
+  getAppointmentByIdService,
 } from '../services/appointmentService.js';
 import { sendSuccess, sendError } from '../utils/responseHelper.js';
 
@@ -18,7 +19,7 @@ export const bookAppointment = async (req, res, next) => {
     const patientId = req.headers['x-user-id'];
     if (!patientId) return sendError(res, 'Unauthorized', 401);
 
-    const { doctorId, date, phase, notes } = req.body;
+    const { doctorId, date, phase, notes, type } = req.body;
 
     const appointment = await bookAppointmentService({
       patientId,
@@ -26,6 +27,7 @@ export const bookAppointment = async (req, res, next) => {
       date,
       phase,
       notes,
+      type,
     });
 
     return sendSuccess(res, appointment, 'Appointment booked successfully', 201);
@@ -100,6 +102,33 @@ export const searchDoctors = async (req, res, next) => {
     const { specialization, name } = req.query;
     const doctors = await searchDoctorsService({ specialization, name });
     return sendSuccess(res, doctors, 'Doctors retrieved');
+  } catch (e) {
+    next(e);
+  }
+};
+
+// GET /api/appointments/internal/:id — internal service fetch by appointment ID
+export const getAppointmentInternal = async (req, res, next) => {
+  try {
+    const appointment = await getAppointmentByIdService(req.params.id);
+    if (!appointment) return sendError(res, 'Appointment not found', 404);
+    return sendSuccess(res, appointment, 'Appointment fetched');
+  } catch (e) {
+    next(e);
+  }
+};
+
+// PATCH /api/appointments/internal/:id/status — internal service status update (no doctor auth)
+export const updateAppointmentStatusInternal = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    if (!status) return sendError(res, 'status is required', 422);
+
+    const appointment = await getAppointmentByIdService(req.params.id);
+    if (!appointment) return sendError(res, 'Appointment not found', 404);
+
+    const updated = await updateAppointmentStatusService(req.params.id, appointment.doctorId, status);
+    return sendSuccess(res, updated, 'Appointment status updated internally');
   } catch (e) {
     next(e);
   }

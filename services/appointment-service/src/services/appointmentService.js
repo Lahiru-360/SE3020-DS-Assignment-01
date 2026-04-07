@@ -28,6 +28,7 @@ export const bookAppointmentService = async ({
   date,
   phase,
   notes,
+  type,
 }) => {
   // 1. Validate doctor exists and is approved (internal call to doctor-service)
   let doctor;
@@ -91,10 +92,11 @@ export const bookAppointmentService = async ({
   const appointment = await createAppointment({
     patientId,
     doctorId,
-    date:    new Date(`${dateStr}T00:00:00.000Z`),
+    date:     new Date(`${dateStr}T00:00:00.000Z`),
     timeSlot: assignedSlot,
-    notes:   notes || null,
-    status:  'pending',
+    notes:    notes || null,
+    status:   'pending',
+    type:     type || 'PHYSICAL',
   });
 
   // 10. Fire-and-forget notifications to both parties
@@ -275,3 +277,7 @@ async function fetchAvailabilityForDate(doctorId, dateStr) {
     throw createHttpError('Could not fetch doctor availability', 502);
   }
 }
+
+// ─── Get appointment by ID (for internal service-to-service calls) ──────────
+export const getAppointmentByIdService = (appointmentId) =>
+  findAppointmentById(appointmentId);

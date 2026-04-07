@@ -17,14 +17,21 @@ import {
   cancelAppointment,
   updateAppointmentStatus,
   searchDoctors,
+  getAppointmentInternal,
+  updateAppointmentStatusInternal,
 } from '../controllers/appointmentController.js';
 import {
   bookAppointmentValidators,
   updateStatusValidators,
   searchDoctorsValidators,
 } from '../validators/appointmentValidators.js';
+import { internalAuth } from '../middleware/internalAuth.js';
 
 const router = Router();
+
+// ── Internal (service-to-service) ─────────────────────────────────────────────
+router.get('/internal/:id',           internalAuth, getAppointmentInternal);
+router.patch('/internal/:id/status',  internalAuth, updateAppointmentStatusInternal);
 
 // ── Patient-facing ────────────────────────────────────────────────────────────
 router.get('/doctors/search', searchDoctorsValidators, searchDoctors);

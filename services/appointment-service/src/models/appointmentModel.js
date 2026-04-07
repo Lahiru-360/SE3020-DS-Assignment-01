@@ -32,6 +32,11 @@ const AppointmentSchema = new mongoose.Schema(
       trim: true,
       default: null,
     },
+    type: {
+      type: String,
+      enum: ['PHYSICAL', 'VIRTUAL'],
+      default: 'PHYSICAL',
+    },
   },
   { timestamps: true }
 );
