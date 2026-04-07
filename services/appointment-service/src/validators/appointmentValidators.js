@@ -12,6 +12,9 @@ export const bookAppointmentValidators = [
     .optional()
     .trim()
     .isLength({ max: 500 }).withMessage('notes must not exceed 500 characters'),
+  body('type')
+    .optional()
+    .isIn(['PHYSICAL', 'VIRTUAL']).withMessage('type must be PHYSICAL or VIRTUAL'),
 ];
 
 export const updateStatusValidators = [

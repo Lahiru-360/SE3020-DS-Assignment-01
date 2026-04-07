@@ -164,6 +164,30 @@ services:
       - hc-network
     # NOT exposed to the host — triggered internally by appointment-service
 
+  # ── Telemedicine Service ──────────────────────────────────────────────────
+  telemedicine-service:
+    build:
+      context: ./services/telemedicine-service
+      dockerfile: Dockerfile
+    container_name: hc-telemedicine-service
+    restart: unless-stopped
+    env_file:
+      - ./services/telemedicine-service/.env.example 
+    environment:
+      PORT: 5005
+      MONGO_URI: mongodb://mongo:27017/telemedicine-service
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
+      APPOINTMENT_SERVICE_URL: http://appointment-service:5003
+    depends_on:
+      - mongo
+      - appointment-service
+    volumes:
+      - ./services/telemedicine-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+    # NOT exposed to the host — all traffic must go through the gateway
+
   # ── API Gateway ───────────────────────────────────────────────
   api-gateway:
     build:
@@ -181,12 +205,14 @@ services:
       DOCTOR_SERVICE_URL: http://doctor-service:5001
       APPOINTMENT_SERVICE_URL: http://appointment-service:5003
       NOTIFICATION_SERVICE_URL: http://notification-service:5004
+      TELEMEDICINE_SERVICE_URL: http://telemedicine-service:5005
     depends_on:
       - auth-service
       - patient-service
       - doctor-service
       - appointment-service
       - notification-service
+      - telemedicine-service
     volumes:
       - ./services/api-gateway:/app
       - /app/node_modules
