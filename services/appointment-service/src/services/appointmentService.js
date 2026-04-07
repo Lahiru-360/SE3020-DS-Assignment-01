@@ -72,20 +72,37 @@ export const bookAppointmentService = async ({
 
   // 7. Queue: pick the first slot not yet booked AND not already started (same-day guard)
   //
-  // When the appointment is for TODAY, we must skip any slot whose window has
-  // already begun — i.e. slotStart <= now.  This ensures a patient booking at
-  // 10:21 is never assigned 10:20 (past) but is moved forward to 10:40.
+  // When the appointment is for TODAY (in the configured timezone), we skip any
+  // slot whose 20-min window has already begun — slotStart <= localNow.
+  // Example: booking at 10:21 LKT → skip 10:20, assign 10:40.
   //
-  // Slots are "HH:mm" strings representing the START of a 20-min window.
-  // A slot is "past" when the current wall-clock minute has already reached or
-  // passed that start time, so we require slotStart > nowMinutes.
-  const todayStr = new Date().toISOString().slice(0, 10); // UTC "YYYY-MM-DD"
+  // TIMEZONE env var controls which timezone "today" and "now" are evaluated
+  // in. Defaults to Asia/Colombo (Sri Lanka, UTC+5:30). Change it in .env if
+  // the server is relocated.
+  const tz = process.env.TIMEZONE || 'Asia/Colombo';
+
+  // Get the current local date string "YYYY-MM-DD" in the configured timezone
+  const localNowParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year:     'numeric',
+    month:    '2-digit',
+    day:      '2-digit',
+  }).formatToParts(new Date());
+  const todayStr = localNowParts.map((p) => p.value).join(''); // "YYYY-MM-DD"
   const isToday  = dateStr === todayStr;
 
+  // Get current local time as total minutes (HH * 60 + mm) in the same timezone
   let nowMinutes = 0;
   if (isToday) {
-    const now = new Date();
-    nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+    const timeParts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz,
+      hour:     '2-digit',
+      minute:   '2-digit',
+      hour12:   false,
+    }).formatToParts(new Date());
+    const localH = Number(timeParts.find((p) => p.type === 'hour').value);
+    const localM = Number(timeParts.find((p) => p.type === 'minute').value);
+    nowMinutes = localH * 60 + localM;
   }
 
   const assignedSlot = allSlots.find((s) => {
