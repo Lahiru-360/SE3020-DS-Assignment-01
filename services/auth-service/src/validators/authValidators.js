@@ -1,4 +1,4 @@
-import { body } from "express-validator";
+import { body, param } from "express-validator";
 
 // ─── Reusable field validators ─────────────────────────────────
 
@@ -82,4 +82,9 @@ export const registerDoctorValidators = [
 export const loginValidators = [
   emailValidator,
   body("password").notEmpty().withMessage("Password is required"),
+];
+
+
+export const adminUserIdValidators = [
+  param("userId").isMongoId().withMessage("Invalid user ID format"),
 ];
