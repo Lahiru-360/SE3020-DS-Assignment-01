@@ -142,10 +142,10 @@ export const bookAppointmentService = async ({
   });
 
   // 10. Fire-and-forget notifications to both parties
- notifyBoth('appointment_booked', appointment).catch((err) =>
+  notifyBoth('appointment_booked', appointment).catch((err) =>
     console.warn('[AppointmentService] notifyBoth error (booked):', err.message)
   );
-  
+
   return appointment;
 };
 
@@ -171,7 +171,9 @@ export const cancelAppointmentService = async (appointmentId, userId, role) => {
 
   const updated = await updateAppointmentById(appointmentId, { status: 'cancelled' });
 
-  notifyBoth('appointment_cancelled', updated).catch(() => {});
+  notifyBoth('appointment_cancelled', updated).catch((err) =>
+    console.warn('[AppointmentService] notifyBoth error (cancelled):', err.message)
+  );
 
   return updated;
 };
@@ -197,7 +199,9 @@ export const updateAppointmentStatusService = async (appointmentId, doctorId, ne
     completed:  'appointment_completed',
     cancelled:  'appointment_cancelled',
   };
-  notifyBoth(notifTypeMap[newStatus], updated).catch(() => {});
+  notifyBoth(notifTypeMap[newStatus], updated).catch((err) =>
+    console.warn('[AppointmentService] notifyBoth error (status update):', err.message)
+  );
 
   return updated;
 };
@@ -250,8 +254,8 @@ async function notifyBoth(type, appt) {
 
   const patientEmail = patient?.email ?? '';
   const patientName  = patient ? `${patient.firstName} ${patient.lastName}` : 'Patient';
-  const patientPhone = patient?.phone ?? null;
-  const doctorEmail  = doctor?.email  ?? '';
+  const patientPhone = patient?.phone   || null;   // null if absent — triggers email-only
+  const doctorEmail  = doctor?.email   ?? '';
   const doctorName   = doctor  ? `${doctor.firstName} ${doctor.lastName}`   : 'Doctor';
   const specialty    = doctor?.specialization ?? '';
 
@@ -265,24 +269,45 @@ async function notifyBoth(type, appt) {
     status:   appt.status,
   };
 
+  // Doctor phone is not fetched — always email-only for the doctor.
   const recipients = [
-    { email: patientEmail, name: patientName, phone: patientPhone },
-    { email: doctorEmail,  name: `Dr. ${doctorName}` },
+    { email: patientEmail, name: patientName,       phone: patientPhone },
+    { email: doctorEmail,  name: `Dr. ${doctorName}`, phone: null },
   ];
 
   for (const recipient of recipients) {
+    // Skip entirely if we have no address to deliver to
     if (!recipient.email) continue;
-    await axios.post(
-      `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/send`,
-      {
-        type,
-        recipientEmail: recipient.email,
-        recipientName:  recipient.name,
-        recipientPhone: recipient.phone,
-        metadata,
-      },
-      { headers: internalHeaders() }
-    );
+
+    // Use 'both' only when a valid phone number is available; otherwise 'email'.
+    // This prevents the notification-service validator from rejecting the request
+    // when recipientPhone is absent.
+    const channel = recipient.phone ? 'both' : 'email';
+
+    const payload = {
+      type,
+      channel,
+      recipientEmail: recipient.email,
+      recipientName:  recipient.name,
+      metadata,
+    };
+    // Only include recipientPhone in the payload when it exists
+    if (recipient.phone) payload.recipientPhone = recipient.phone;
+
+    try {
+      await axios.post(
+        `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/send`,
+        payload,
+        { headers: internalHeaders() }
+      );
+    } catch (err) {
+      // Log per-recipient failures so they are visible in service logs,
+      // but continue sending to the remaining recipients.
+      console.error(
+        `[AppointmentService] Notification (${type}) failed for ${recipient.email}:`,
+        err.response?.data ?? err.message
+      );
+    }
   }
 }
 
