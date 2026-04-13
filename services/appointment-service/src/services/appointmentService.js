@@ -142,8 +142,10 @@ export const bookAppointmentService = async ({
   });
 
   // 10. Fire-and-forget notifications to both parties
-  notifyBoth('appointment_booked', appointment).catch(() => {});
-
+ notifyBoth('appointment_booked', appointment).catch((err) =>
+    console.warn('[AppointmentService] notifyBoth error (booked):', err.message)
+  );
+  
   return appointment;
 };
 
