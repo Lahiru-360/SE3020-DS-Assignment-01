@@ -22,11 +22,6 @@ const AppointmentSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    status: {
-      type: String,
-      enum: ['pending', 'confirmed', 'cancelled', 'completed'],
-      default: 'pending',
-    },
     notes: {
       type: String,
       trim: true,
@@ -36,6 +31,47 @@ const AppointmentSchema = new mongoose.Schema(
       type: String,
       enum: ['PHYSICAL', 'VIRTUAL'],
       default: 'PHYSICAL',
+    },
+
+    // Appointment lifecycle status (unchanged)
+    status: {
+      type: String,
+      enum: ['pending', 'confirmed', 'cancelled', 'completed'],
+      default: 'pending',
+    },
+
+    // --- NEW: Payment-related fields ---
+
+    // The fee for THIS appointment set at booking time.
+    // Store it here so you have a record even if the doctor
+    // changes their fee later. Denominated in smallest unit (cents).
+    consultationFee: {
+      type: Number,
+      required: true,
+    },
+
+    // Always store the currency explicitly — never assume.
+    currency: {
+      type: String,
+      default: 'LKR',
+      uppercase: true,
+    },
+
+    // Tracks whether money has been collected — separate from
+    // appointment status. An appointment can be 'confirmed' but
+    // still 'unpaid' if the webhook hasn't arrived yet.
+    paymentStatus: {
+      type: String,
+      enum: ['unpaid', 'paid', 'refunded', 'failed'],
+      default: 'unpaid',
+    },
+
+    // The _id of the matching document in the transactions collection.
+    // Lets you do: Transaction.findById(appointment.paymentId)
+    // without needing a separate lookup by appointmentId.
+    paymentId: {
+      type: String,
+      default: null,
     },
   },
   { timestamps: true }
