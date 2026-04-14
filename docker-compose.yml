@@ -96,6 +96,7 @@ services:
       PORT: 5001
       MONGO_URI: mongodb://mongo:27017/doctor-service
       INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
+      APPOINTMENT_SERVICE_URL: http://appointment-service:5003
     depends_on:
       - mongo
     volumes:
@@ -113,7 +114,7 @@ services:
     container_name: hc-appointment-service
     restart: unless-stopped
     env_file:
-      - ./services/appointment-service/.env.example   # replace with .env in production
+      - ./services/appointment-service/.env.example # replace with .env in production
     environment:
       PORT: 5003
       MONGO_URI: mongodb://mongo:27017/appointment-service
@@ -142,7 +143,7 @@ services:
     container_name: hc-notification-service
     restart: unless-stopped
     env_file:
-      - ./services/notification-service/.env.example  # replace with .env in production
+      - ./services/notification-service/.env.example # replace with .env in production
     environment:
       PORT: 5004
       MONGO_URI: mongodb://mongo:27017/notification-service
@@ -172,7 +173,7 @@ services:
     container_name: hc-telemedicine-service
     restart: unless-stopped
     env_file:
-      - ./services/telemedicine-service/.env.example 
+      - ./services/telemedicine-service/.env.example
     environment:
       PORT: 5005
       MONGO_URI: mongodb://mongo:27017/telemedicine-service
