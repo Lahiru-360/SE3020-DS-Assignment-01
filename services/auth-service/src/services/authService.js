@@ -7,6 +7,8 @@ import {
   createUser,
   saveUser,
   deleteUserById,
+  findAllUsers,
+  countUsers,
 } from "../repositories/userRepository.js";
 import {
   signAccessToken,
@@ -195,6 +197,103 @@ export const rejectDoctorService = async (userId) => {
       "Doctor service unavailable. Please try again later.",
       503,
     );
+  }
+
+  await deleteUserById(userId);
+};
+
+// ─── Admin user-management service functions ───────────────────────────────
+
+export const getAllUsersService = async ({
+  role,
+  isActive,
+  page = 1,
+  limit = 20,
+  email,
+} = {}) => {
+  const filter = {};
+  if (role) filter.role = role;
+  if (isActive !== undefined && isActive !== "")
+    filter.isActive = isActive === "true" || isActive === true;
+  // Sanitise the search string before using it in a regex
+  if (email)
+    filter.email = {
+      $regex: email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+      $options: "i",
+    };
+
+  const parsedPage  = Math.max(1, parseInt(page,  10) || 1);
+  const parsedLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+  const skip        = (parsedPage - 1) * parsedLimit;
+
+  const [users, total] = await Promise.all([
+    findAllUsers(filter, skip, parsedLimit),
+    countUsers(filter),
+  ]);
+
+  return {
+    users,
+    total,
+    page: parsedPage,
+    limit: parsedLimit,
+    totalPages: Math.ceil(total / parsedLimit),
+  };
+};
+
+export const getUserByIdService = async (userId) => {
+  const user = await findUserById(userId);
+  if (!user) throw createHttpError("User not found", 404);
+  const { password: _pw, ...safeUser } = user.toObject();
+  return safeUser;
+};
+
+export const deactivateUserService = async (userId, requestingAdminId) => {
+  if (userId === requestingAdminId)
+    throw createHttpError("Cannot deactivate your own account", 400);
+  const user = await findUserById(userId);
+  if (!user) throw createHttpError("User not found", 404);
+  if (user.role === "admin")
+    throw createHttpError("Cannot deactivate an admin account", 403);
+  if (!user.isActive)
+    throw createHttpError("User account is already inactive", 409);
+  user.isActive = false;
+  await saveUser(user);
+};
+
+export const activateUserService = async (userId) => {
+  const user = await findUserById(userId);
+  if (!user) throw createHttpError("User not found", 404);
+  if (user.isActive)
+    throw createHttpError("User account is already active", 409);
+  user.isActive = true;
+  await saveUser(user);
+};
+
+export const deleteUserService = async (userId, requestingAdminId) => {
+  if (userId === requestingAdminId)
+    throw createHttpError("Cannot delete your own account", 400);
+  const user = await findUserById(userId);
+  if (!user) throw createHttpError("User not found", 404);
+  if (user.role === "admin")
+    throw createHttpError("Cannot delete an admin account", 403);
+
+  // Best-effort cascade: remove the downstream profile (non-fatal if it fails)
+  if (user.role === "patient") {
+    try {
+      await axios.delete(
+        `${process.env.PATIENT_SERVICE_URL}/api/patients/internal/${userId}`,
+        { headers: { "x-internal-secret": process.env.INTERNAL_SECRET } },
+      );
+    } catch { /* non-fatal */ }
+  }
+
+  if (user.role === "doctor") {
+    try {
+      await axios.delete(
+        `${process.env.DOCTOR_SERVICE_URL}/api/doctors/internal/${userId}`,
+        { headers: { "x-internal-secret": process.env.INTERNAL_SECRET } },
+      );
+    } catch { /* non-fatal */ }
   }
 
   await deleteUserById(userId);
