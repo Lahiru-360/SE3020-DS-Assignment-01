@@ -188,6 +188,29 @@ services:
       - hc-network
     # NOT exposed to the host — all traffic must go through the gateway
 
+  # ── AI Suggestion Service ──────────────────────────────────────────────
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: hc-ai-service
+    restart: unless-stopped
+    env_file:
+      - ./services/ai-service/.env
+    environment:
+      PORT: 5008
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
+      DOCTOR_SERVICE_URL: http://doctor-service:5001
+    depends_on:
+      - mongo
+      - doctor-service
+    volumes:
+      - ./services/ai-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+    # NOT exposed to the host — all traffic must go through the gateway
+
   # ── API Gateway ───────────────────────────────────────────────
   api-gateway:
     build:
@@ -206,6 +229,7 @@ services:
       APPOINTMENT_SERVICE_URL: http://appointment-service:5003
       NOTIFICATION_SERVICE_URL: http://notification-service:5004
       TELEMEDICINE_SERVICE_URL: http://telemedicine-service:5005
+      AI_SERVICE_URL: http://ai-service:5008
     depends_on:
       - auth-service
       - patient-service
@@ -213,6 +237,7 @@ services:
       - appointment-service
       - notification-service
       - telemedicine-service
+      - ai-service
     volumes:
       - ./services/api-gateway:/app
       - /app/node_modules
