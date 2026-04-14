@@ -29,6 +29,8 @@ export const bookAppointmentService = async ({
   phase,
   notes,
   type,
+  consultationFee,
+  currency,
 }) => {
   // 1. Validate doctor exists and is approved (internal call to doctor-service)
   let doctor;
@@ -134,11 +136,13 @@ export const bookAppointmentService = async ({
   const appointment = await createAppointment({
     patientId,
     doctorId,
-    date:     new Date(`${dateStr}T00:00:00.000Z`),
-    timeSlot: assignedSlot,
-    notes:    notes || null,
-    status:   'pending',
-    type:     type || 'PHYSICAL',
+    date:            new Date(`${dateStr}T00:00:00.000Z`),
+    timeSlot:        assignedSlot,
+    notes:           notes || null,
+    status:          'pending',
+    type:            type || 'PHYSICAL',
+    consultationFee: consultationFee || doctor.consultationFee,
+    currency:        currency || doctor.currency || 'LKR',
   });
 
   // 10. Fire-and-forget notifications to both parties

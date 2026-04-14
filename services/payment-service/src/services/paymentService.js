@@ -103,10 +103,10 @@ export const createPaymentIntentService = async ({ appointmentId, patientId }) =
   }
 
   // c. Create Stripe PaymentIntent
-  //    amount is in smallest currency unit — LKR is zero-decimal in Stripe
-  //    so LKR 2500 → amount: 2500 (NOT 250000 like USD)
+  //    amount is in smallest currency unit — LKR is a 2-decimal currency in Stripe
+  //    so LKR 2500 → amount: 250000 (like USD cents)
   const paymentIntent = await stripe.paymentIntents.create({
-    amount:   appointment.consultationFee,   // stored on appointment at booking time
+    amount:   Math.round(appointment.consultationFee * 100),   // convert to smallest unit (cents)
     currency: (appointment.currency || 'LKR').toLowerCase(),
     metadata: {
       appointmentId: appointmentId.toString(),

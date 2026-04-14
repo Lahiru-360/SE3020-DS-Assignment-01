@@ -20,7 +20,7 @@ export const bookAppointment = async (req, res, next) => {
     const patientId = req.headers['x-user-id'];
     if (!patientId) return sendError(res, 'Unauthorized', 401);
 
-    const { doctorId, date, phase, notes, type } = req.body;
+    const { doctorId, date, phase, notes, type, consultationFee } = req.body;
 
     const appointment = await bookAppointmentService({
       patientId,
@@ -29,6 +29,7 @@ export const bookAppointment = async (req, res, next) => {
       phase,
       notes,
       type,
+      consultationFee,
     });
 
     return sendSuccess(res, appointment, 'Appointment booked successfully', 201);
@@ -140,12 +141,15 @@ export const updateAppointmentStatusInternal = async (req, res, next) => {
 export const updatePaymentStatusInternal = async (req, res, next) => {
   try {
     const { paymentStatus, paymentId } = req.body;
-    if (!paymentStatus) return sendError(res, 'paymentStatus is required', 422);
+    if (!paymentStatus && !paymentId) {
+      return sendError(res, 'paymentStatus or paymentId is required', 422);
+    }
 
     const appointment = await getAppointmentByIdService(req.params.id);
     if (!appointment) return sendError(res, 'Appointment not found', 404);
 
-    const updates = { paymentStatus };
+    const updates = {};
+    if (paymentStatus) updates.paymentStatus = paymentStatus;
     if (paymentId) updates.paymentId = paymentId;
 
     const updated = await updatePaymentStatusService(req.params.id, updates);

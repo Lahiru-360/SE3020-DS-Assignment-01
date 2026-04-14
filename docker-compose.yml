@@ -73,7 +73,8 @@ services:
       PORT: 5002
       MONGO_URI: mongodb://mongo:27017/patient-service
       INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
-      # The env_file will supply SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
     depends_on:
       - mongo
     volumes:
