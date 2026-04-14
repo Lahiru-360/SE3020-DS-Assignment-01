@@ -201,6 +201,7 @@ services:
       PORT: 5008
       INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
       DOCTOR_SERVICE_URL: http://doctor-service:5001
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-AIzaSyAUAe3f23XZaCjO7rnyIEuHo1uwR8DG4aY}
     depends_on:
       - mongo
       - doctor-service
