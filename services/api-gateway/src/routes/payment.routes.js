@@ -53,9 +53,10 @@ router.post('/api/payments/webhook',
 router.use('/api/payments', verifyToken);
 
 // ── Role-specific guards ───────────────────────────────────────────────────
-router.post('/api/payments/create-intent', requireRole('patient'), paymentProxy);
-router.get('/api/payments/my',             requireRole('patient'), paymentProxy);
-router.post('/api/payments/refund/:id',    requireRole('admin'),   paymentProxy);
+// These call next() if authorized, allowing the proxy below to forward the request.
+router.post('/api/payments/create-intent', requireRole('patient'));
+router.get('/api/payments/my',             requireRole('patient'));
+router.post('/api/payments/refund/:id',    requireRole('admin'));
 
 // ── Block access to internal-only routes from the outside ──────────────────
 router.all('/api/payments/internal*', (req, res) => {
