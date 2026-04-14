@@ -165,20 +165,27 @@ export const handleWebhookService = async (rawBody, stripeSignature) => {
     throw createHttpError(`Webhook signature verification failed: ${err.message}`, 400);
   }
 
-  const paymentIntent = event.data.object;
+  const stripeObject = event.data.object;
+  
+  // Extract PaymentIntent ID based on event type
+  // For payment_intent.* events: stripeObject.id is the PI ID
+  // For charge.* events: stripeObject.payment_intent is the PI ID
+  const paymentIntentId = event.type.startsWith('charge.') 
+    ? stripeObject.payment_intent 
+    : stripeObject.id;
 
   // Find our Transaction record using the Stripe PaymentIntent ID
-  const transaction = await findTransactionByStripeIntentId(paymentIntent.id);
+  const transaction = await findTransactionByStripeIntentId(paymentIntentId);
   if (!transaction) {
     // Unknown transaction — log and ignore (could be from another app in same Stripe account)
-    console.warn(`[PaymentService] Webhook: no transaction for intent ${paymentIntent.id}`);
+    console.warn(`[PaymentService] Webhook: no transaction for intent ${paymentIntentId} (Event: ${event.type})`);
     return { received: true };
   }
 
   // ── Success path ────────────────────────────────────────────────────────────
   if (event.type === 'payment_intent.succeeded') {
     // Extract PCI-safe card metadata from the latest charge
-    const chargeId   = paymentIntent.latest_charge;
+    const chargeId   = stripeObject.latest_charge;
     let cardLast4    = null;
     let cardBrand    = null;
     let cardExpMonth = null;
@@ -224,7 +231,7 @@ export const handleWebhookService = async (rawBody, stripeSignature) => {
   // ── Failure path ────────────────────────────────────────────────────────────
   if (event.type === 'payment_intent.payment_failed') {
     const failureReason =
-      paymentIntent.last_payment_error?.message || 'Payment failed';
+      stripeObject.last_payment_error?.message || 'Payment failed';
 
     await updateTransactionById(transaction._id, {
       status:            'failed',
