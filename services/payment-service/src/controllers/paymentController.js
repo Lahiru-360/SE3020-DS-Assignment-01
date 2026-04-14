@@ -3,6 +3,7 @@ import {
   createPaymentIntentService,
   handleWebhookService,
   getMyTransactionsService,
+  refundPaymentService,
 } from '../services/paymentService.js';
 import { sendSuccess, sendError } from '../utils/responseHelper.js';
 
@@ -75,6 +76,35 @@ export const getMyTransactions = async (req, res, next) => {
 
     const transactions = await getMyTransactionsService(patientId);
     return sendSuccess(res, transactions, 'Transactions fetched');
+  } catch (e) {
+    next(e);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/payments/refund/:appointmentId (Admin)
+// POST /api/payments/internal/refund/:appointmentId (Internal)
+// ─────────────────────────────────────────────────────────────────────────────
+export const refundPayment = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
+
+    const { appointmentId } = req.params;
+    const result = await refundPaymentService(appointmentId);
+
+    return sendSuccess(res, result, 'Refund initiated successfully');
+  } catch (e) {
+    next(e);
+  }
+};
+
+export const refundPaymentInternal = async (req, res, next) => {
+  try {
+    const { appointmentId } = req.params;
+    const result = await refundPaymentService(appointmentId);
+
+    return sendSuccess(res, result, 'Internal refund processed');
   } catch (e) {
     next(e);
   }

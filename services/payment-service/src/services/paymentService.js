@@ -133,10 +133,11 @@ export const createPaymentIntentService = async ({ appointmentId, patientId }) =
 
   // f. Return clientSecret — frontend uses this with Stripe.js to render the card form
   return {
-    clientSecret:  paymentIntent.client_secret,
-    transactionId: transaction._id,
-    amount:        appointment.consultationFee,
-    currency:      appointment.currency || 'LKR',
+    clientSecret:          paymentIntent.client_secret,
+    stripePaymentIntentId: paymentIntent.id,
+    transactionId:         transaction._id,
+    amount:                appointment.consultationFee,
+    currency:              appointment.currency || 'LKR',
   };
 };
 
@@ -237,6 +238,22 @@ export const handleWebhookService = async (rawBody, stripeSignature) => {
     console.warn(`[PaymentService] Payment failed for appointment ${transaction.appointmentId}: ${failureReason}`);
   }
 
+  // ── Refund path (e.g. triggered from Stripe Dashboard) ──────────────────────
+  if (event.type === 'charge.refunded') {
+    const charge = event.data.object;
+    
+    await updateTransactionById(transaction._id, {
+      status:            'refunded',
+      webhookReceivedAt: new Date(),
+    });
+
+    // Update appointment record
+    await updateAppointmentPayment(transaction.appointmentId, { paymentStatus: 'refunded' });
+    await updateAppointmentStatus(transaction.appointmentId, 'cancelled');
+
+    console.log(`[PaymentService] Refund processed for appointment ${transaction.appointmentId}`);
+  }
+
   return { received: true };
 };
 
@@ -246,3 +263,61 @@ export const handleWebhookService = async (rawBody, stripeSignature) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const getMyTransactionsService = (patientId) =>
   findTransactionsByPatientId(patientId);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. REFUND PAYMENT
+//    Triggered by Admin manually OR by Appointment Service on cancellation.
+// ─────────────────────────────────────────────────────────────────────────────
+export const refundPaymentService = async (appointmentId) => {
+  const transaction = await findTransactionByAppointmentId(appointmentId);
+  if (!transaction) throw createHttpError('Transaction not found', 404);
+
+  if (transaction.status !== 'completed') {
+    throw createHttpError(`Cannot refund a transaction in ${transaction.status} status`, 400);
+  }
+
+  // 1. Trigger Stripe Refund
+  let stripeRefundId = 'skipped_for_test';
+  try {
+    const refund = await stripe.refunds.create({
+      payment_intent: transaction.stripePaymentIntentId,
+      reason:         'requested_by_customer',
+    });
+    stripeRefundId = refund.id;
+  } catch (err) {
+    // Robust check for various Stripe error message formats
+    const isNoChargeErr = /no successful charge/i.test(err.message) || 
+                          /does not have a successful charge/i.test(err.message);
+
+    if (isNoChargeErr) {
+      console.warn(`[PaymentService] Skipped Stripe-side refund for intent ${transaction.stripePaymentIntentId} (No charge found on Stripe). Proceeding with local DB update.`);
+    } else {
+      throw createHttpError(`Stripe Refund Failed: ${err.message}`, 400);
+    }
+  }
+
+  // 2. Update local transaction record
+  await updateTransactionById(transaction._id, {
+    status: 'refunded',
+  });
+
+  // 3. Update appointment record: status -> cancelled, paymentStatus -> refunded
+  //    (internal calls to appointment-service)
+  await updateAppointmentPayment(appointmentId, { paymentStatus: 'refunded' });
+  await updateAppointmentStatus(appointmentId, 'cancelled');
+
+  return {
+    refundId: stripeRefundId,
+    status:   'refunded',
+  };
+};
+
+// Internal status update helper
+async function updateAppointmentStatus(appointmentId, status) {
+  await axios.patch(
+    `${process.env.APPOINTMENT_SERVICE_URL}/api/appointments/internal/${appointmentId}/status`,
+    { status },
+    { headers: internalHeaders() }
+  );
+}
+

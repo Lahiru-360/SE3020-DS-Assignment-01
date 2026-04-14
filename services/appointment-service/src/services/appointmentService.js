@@ -175,6 +175,17 @@ export const cancelAppointmentService = async (appointmentId, userId, role) => {
 
   const updated = await updateAppointmentById(appointmentId, { status: 'cancelled' });
 
+  // If already paid, trigger automatic refund via Payment Service
+  if (appt.paymentStatus === 'paid') {
+    axios.post(
+      `${process.env.PAYMENT_SERVICE_URL}/api/payments/internal/refund/${appointmentId}`,
+      {},
+      { headers: { 'x-internal-secret': process.env.INTERNAL_SECRET } }
+    ).catch((err) => 
+      console.warn('[AppointmentService] Auto-refund failed:', err.message)
+    );
+  }
+
   notifyBoth('appointment_cancelled', updated).catch((err) =>
     console.warn('[AppointmentService] notifyBoth error (cancelled):', err.message)
   );
