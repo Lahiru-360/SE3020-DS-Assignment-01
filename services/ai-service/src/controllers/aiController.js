@@ -6,25 +6,32 @@ export const getSmartMatch = async (req, res, next) => {
   try {
     const { symptoms } = req.body;
 
-    if (!symptoms) {
-      return sendError(res, 'Symptoms are required', 400);
-    }
-
     // 1. Get AI Analysis from Gemini
     const aiAnalysis = await analyzeSymptoms(symptoms);
 
     // 2. Fetch doctors matching the suggested specialty
-    // Note: The doctor-service uses 'specialization' as key, 
-    // AI returns 'specialty'. We map them here.
-    const doctors = await searchDoctorsBySpecialty(aiAnalysis.specialty);
+    // Fault Tolerant Design: If doctor lookup fails, we still return the AI advice.
+    let doctors = [];
+    let lookupStatus = 'success';
+
+    try {
+      doctors = await searchDoctorsBySpecialty(aiAnalysis.specialty);
+    } catch (doctorError) {
+      console.log(`[AI-Service] Doctor lookup failed or timed out: ${doctorError.message}`);
+      lookupStatus = 'unavailable';
+    }
 
     // 3. Return combined response
     return sendSuccess(res, {
       aiSuggestion: aiAnalysis,
-      suggestedDoctors: doctors
+      suggestedDoctors: doctors,
+      metadata: {
+        doctorLookup: lookupStatus
+      }
     }, 'AI match completed successfully');
 
   } catch (error) {
+    console.log(`[AI-Service] Analysis Error: ${error.message}`);
     next(error);
   }
 };

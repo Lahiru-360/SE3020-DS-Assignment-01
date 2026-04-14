@@ -3,6 +3,7 @@ import { config } from '../config/index.js';
 
 const doctorApi = axios.create({
   baseURL: config.DOCTOR_SERVICE_URL,
+  timeout: 10000,
   headers: {
     'x-internal-secret': config.INTERNAL_SECRET,
   },

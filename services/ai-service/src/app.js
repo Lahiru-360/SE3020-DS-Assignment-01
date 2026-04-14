@@ -12,10 +12,6 @@ app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
 
-app.get('/health', (req, res) => {
-  res.json({ success: true, message: 'AI suggestion service running', data: null });
-});
-
 app.use('/ai', aiRoutes);
 
 // Error handling middleware
