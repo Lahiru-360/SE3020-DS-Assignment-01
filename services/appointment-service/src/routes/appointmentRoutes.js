@@ -19,6 +19,7 @@ import {
   searchDoctors,
   getAppointmentInternal,
   updateAppointmentStatusInternal,
+  updatePaymentStatusInternal,
 } from '../controllers/appointmentController.js';
 import {
   bookAppointmentValidators,
@@ -30,8 +31,9 @@ import { internalAuth } from '../middleware/internalAuth.js';
 const router = Router();
 
 // ── Internal (service-to-service) ─────────────────────────────────────────────
-router.get('/internal/:id',           internalAuth, getAppointmentInternal);
-router.patch('/internal/:id/status',  internalAuth, updateAppointmentStatusInternal);
+router.get('/internal/:id',            internalAuth, getAppointmentInternal);
+router.patch('/internal/:id/status',   internalAuth, updateAppointmentStatusInternal);
+router.patch('/internal/:id/payment',  internalAuth, updatePaymentStatusInternal);
 
 // ── Patient-facing ────────────────────────────────────────────────────────────
 router.get('/doctors/search', searchDoctorsValidators, searchDoctors);

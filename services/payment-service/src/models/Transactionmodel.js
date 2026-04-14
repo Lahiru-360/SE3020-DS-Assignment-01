@@ -64,6 +64,29 @@ const TransactionSchema = new mongoose.Schema(
             default: null,
         },
 
+        // --- Card metadata (PCI-safe — from Stripe charge object, NOT raw card data) ---
+        // Stripe handles raw card data. These fields are safe to store.
+        cardLast4: {
+            type: String,
+            default: null,      // e.g. "4242"
+        },
+        cardBrand: {
+            type: String,
+            default: null,      // e.g. "visa", "mastercard"
+        },
+        cardExpMonth: {
+            type: Number,
+            default: null,      // e.g. 12
+        },
+        cardExpYear: {
+            type: Number,
+            default: null,      // e.g. 2028
+        },
+        cardCountry: {
+            type: String,
+            default: null,      // e.g. "US"
+        },
+
         // --- Failure tracking ---
         failureReason: {
             type: String,

@@ -7,6 +7,7 @@ import {
   updateAppointmentStatusService,
   searchDoctorsService,
   getAppointmentByIdService,
+  updatePaymentStatusService,
 } from '../services/appointmentService.js';
 import { sendSuccess, sendError } from '../utils/responseHelper.js';
 
@@ -133,3 +134,24 @@ export const updateAppointmentStatusInternal = async (req, res, next) => {
     next(e);
   }
 };
+
+// PATCH /api/appointments/internal/:id/payment — called by payment-service after webhook
+// Updates paymentStatus ('unpaid' | 'paid' | 'failed' | 'refunded') and optionally paymentId.
+export const updatePaymentStatusInternal = async (req, res, next) => {
+  try {
+    const { paymentStatus, paymentId } = req.body;
+    if (!paymentStatus) return sendError(res, 'paymentStatus is required', 422);
+
+    const appointment = await getAppointmentByIdService(req.params.id);
+    if (!appointment) return sendError(res, 'Appointment not found', 404);
+
+    const updates = { paymentStatus };
+    if (paymentId) updates.paymentId = paymentId;
+
+    const updated = await updatePaymentStatusService(req.params.id, updates);
+    return sendSuccess(res, updated, 'Appointment payment status updated');
+  } catch (e) {
+    next(e);
+  }
+};
+

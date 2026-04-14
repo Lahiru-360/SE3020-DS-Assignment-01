@@ -350,3 +350,10 @@ async function fetchAvailabilityForDate(doctorId, dateStr) {
 // ─── Get appointment by ID (for internal service-to-service calls) ──────────
 export const getAppointmentByIdService = (appointmentId) =>
   findAppointmentById(appointmentId);
+
+// ─── Update appointment payment fields (called by payment-service webhook) ──
+// Updates paymentStatus ('unpaid' | 'paid' | 'failed' | 'refunded')
+// and optionally paymentId (the Transaction _id from payment-service).
+export const updatePaymentStatusService = (appointmentId, updates) =>
+  updateAppointmentById(appointmentId, updates);
+
