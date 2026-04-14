@@ -7,7 +7,6 @@ export const analyzeSymptoms = async (symptoms) => {
   let lastError = null;
 
   console.log('Using API Key (first 5 chars):', config.GEMINI_API_KEY ? config.GEMINI_API_KEY.substring(0, 5) : 'MISSING');
-  console.log('Preferred Model:', config.GEMINI_MODEL);
 
   for (const modelName of modelsToTry) {
     if (!modelName) continue;
@@ -15,9 +14,6 @@ export const analyzeSymptoms = async (symptoms) => {
     try {
       console.log(`Attempting analysis with model: ${modelName}`);
       const genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY || '');
-      
-      // The SDK doesn't easily support overriding the BASE_URL directly in the constructor,
-      // but the model name is the primary differentiator.
       const model = genAI.getGenerativeModel({ model: modelName });
 
       const prompt = `
@@ -27,7 +23,8 @@ export const analyzeSymptoms = async (symptoms) => {
         {
           "specialty": "Cardiologist",
           "reason": "One sentence explanation why",
-          "urgency": "normal"
+          "urgency": "normal",
+          "warning": null
         }
 
         The "specialty" must be exactly one of the following:
@@ -35,10 +32,11 @@ export const analyzeSymptoms = async (symptoms) => {
 
         Guidelines:
         1. If symptoms suggest a life-threatening emergency (e.g., heart attack signs, stroke signs, severe bleeding, difficulty breathing), set "urgency" to "emergency" and "specialty" to "General Physician".
-        2. If symptoms are urgent but not life-threatening, set "urgency" to "urgent".
-        3. Otherwise, set "urgency" to "normal".
-        4. If the symptoms are unclear, default to "General Physician" with "urgency" as "normal".
-        5. The "reason" should be a concise, professional explanation for the suggestion.
+        2. In emergency cases, set "warning" to "IMMEDIATE ACTION REQUIRED: Please proceed to the nearest Emergency Room or call emergency services (e.g., 911/199) immediately."
+        3. If symptoms are urgent but not life-threatening, set "urgency" to "urgent" and "warning" to null.
+        4. Otherwise, set "urgency" to "normal" and "warning" to null.
+        5. If the symptoms are unclear, default to "General Physician" with "urgency" as "normal".
+        6. The "reason" should be a concise, professional explanation for the suggestion.
 
         Response (JSON only):
       `;
@@ -54,11 +52,17 @@ export const analyzeSymptoms = async (symptoms) => {
         throw new Error('Invalid AI response format');
       }
       
-      return JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      // Safety check: force standardized warning if Gemini missed it but flagged emergency
+      if (parsed.urgency === 'emergency' && !parsed.warning) {
+        parsed.warning = "IMMEDIATE ACTION REQUIRED: Please proceed to the nearest Emergency Room or call emergency services immediately.";
+      }
+
+      return parsed;
     } catch (error) {
       console.warn(`Model ${modelName} failed:`, error.message);
       lastError = error;
-      // Continue to next model
       continue;
     }
   }
@@ -68,6 +72,7 @@ export const analyzeSymptoms = async (symptoms) => {
   return {
     specialty: 'General Physician',
     reason: 'Based on the input provided, we recommend seeing a general physician for an initial assessment.',
-    urgency: 'normal'
+    urgency: 'normal',
+    warning: null
   };
 };
