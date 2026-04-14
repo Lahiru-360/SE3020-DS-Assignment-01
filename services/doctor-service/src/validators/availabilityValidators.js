@@ -1,7 +1,7 @@
 import { body, param } from "express-validator";
 
 export const addAvailabilityValidators = [
-  body("doctorId").trim().notEmpty().withMessage("doctorId is required"),
+  // doctorId is derived from the verified JWT (x-user-id header) — not accepted from body.
   body("date")
     .trim()
     .notEmpty()
