@@ -1,8 +1,21 @@
-import { HeartPulse, CalendarDays, Settings, Wallet } from "lucide-react";
-import { useAuth } from "../context/useAuth";
+import { useLocation } from "react-router-dom";
+import {
+  HeartPulse,
+  CalendarDays,
+  Settings,
+  Wallet,
+  ClipboardList,
+} from "lucide-react";
 import DashboardLayout from "../components/layout/DashboardLayout";
+import PatientOverview from "./patient/PatientOverview";
+import PatientAppointments from "./patient/PatientAppointments";
+import PatientPrescriptions from "./patient/PatientPrescriptions";
+import PatientPayments from "./patient/PatientPayments";
+import PatientSettings from "./patient/PatientSettings";
 
-const MOTHER_NAV = [
+// ── Navigation items ───────────────────────────────────────────────────────
+
+const PATIENT_NAV = [
   {
     label: "Overview",
     path: "/patient/overview",
@@ -12,6 +25,11 @@ const MOTHER_NAV = [
     label: "Appointments",
     path: "/patient/appointments",
     icon: <CalendarDays size={18} />,
+  },
+  {
+    label: "Prescriptions",
+    path: "/patient/prescriptions",
+    icon: <ClipboardList size={18} />,
   },
   {
     label: "Payments",
@@ -25,31 +43,27 @@ const MOTHER_NAV = [
   },
 ];
 
-function User() {
-  const { userRole } = useAuth();
+// ── Route → section map ────────────────────────────────────────────────────
+
+const SECTION_MAP = {
+  "/patient/overview": PatientOverview,
+  "/patient/appointments": PatientAppointments,
+  "/patient/prescriptions": PatientPrescriptions,
+  "/patient/payments": PatientPayments,
+  "/patient/settings": PatientSettings,
+};
+
+// ── Shell ──────────────────────────────────────────────────────────────────
+
+function Patient() {
+  const { pathname } = useLocation();
+  const Section = SECTION_MAP[pathname] ?? PatientOverview;
 
   return (
-    <DashboardLayout navItems={MOTHER_NAV}>
-      <div className="w-full mx-auto max-w-3xl">
-        <header className="mb-10 text-center">
-          <h1 className="text-3xl md:text-4xl font-bold text-text-primary">
-            Welcome
-          </h1>
-          <p className="mt-3 max-w-2xl mx-auto text-sm md:text-base text-text-secondary">
-            You are logged in as{" "}
-            <span className="font-semibold">{userRole}</span>.
-          </p>
-          <div className="mt-5 flex justify-center">
-            <span className="h-1 w-20 rounded-full bg-primary" />
-          </div>
-        </header>
-
-        <div className="rounded-xl border border-border bg-bg-card shadow-sm p-6 text-center">
-          <p className="text-text-secondary">Placeholder page for Mothers.</p>
-        </div>
-      </div>
+    <DashboardLayout navItems={PATIENT_NAV}>
+      <Section />
     </DashboardLayout>
   );
 }
 
-export default User;
+export default Patient;

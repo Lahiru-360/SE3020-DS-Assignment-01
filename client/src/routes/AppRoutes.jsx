@@ -8,6 +8,9 @@ const Admin = lazy(() => import("../pages/Admin"));
 const NotFound = lazy(() => import("../pages/NotFound"));
 const User = lazy(() => import("../pages/Mother"));
 const Doctor = lazy(() => import("../pages/Doctor"));
+const PatientBookingPage = lazy(() =>
+  import("../pages/patient/PatientBookingPage"),
+);
 
 export const appRoutes = [
   {
@@ -116,6 +119,13 @@ export const appRoutes = [
     hideChrome: true,
   },
   {
+    path: "/patient/prescriptions",
+    component: User,
+    requiresAuth: true,
+    allowedRoles: ["patient"],
+    hideChrome: true,
+  },
+  {
     path: "/patient/payments",
     component: User,
     requiresAuth: true,
@@ -125,6 +135,13 @@ export const appRoutes = [
   {
     path: "/patient/settings",
     component: User,
+    requiresAuth: true,
+    allowedRoles: ["patient"],
+    hideChrome: true,
+  },
+  {
+    path: "/patient/doctors/:doctorId",
+    component: PatientBookingPage,
     requiresAuth: true,
     allowedRoles: ["patient"],
     hideChrome: true,

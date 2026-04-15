@@ -1,4 +1,4 @@
-import { useLocation } from "react-router-dom";
+import { useLocation, matchPath } from "react-router-dom";
 import Header from "./components/ui/Header";
 import RouteRenderer from "./routes/RouteRenderer";
 import Footer from "./components/ui/Footer";
@@ -9,7 +9,7 @@ function App() {
   const { pathname } = useLocation();
 
   const currentRoute = appRoutes.find((r) =>
-    r.path === "*" ? false : r.path === pathname,
+    r.path === "*" ? false : !!matchPath(r.path, pathname),
   );
   const hideChrome = currentRoute?.hideChrome ?? false;
 
