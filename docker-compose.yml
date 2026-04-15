@@ -15,6 +15,8 @@
 #   appointment-service   → port 5003  (internal only)
 #   notification-service  → port 5004  (internal only)
 #   telemedicine-service  → port 5005  (internal only)
+#   payment-service       → port 5006  (internal only)
+#   ai-service            → port 5008  (internal only)
 #   rabbitmq              → port 5672  (AMQP) / 15672 (management UI)
 #   mongo                 → port 27017 (internal only)
 # ─────────────────────────────────────────────────────────────────
@@ -159,6 +161,44 @@ services:
     networks:
       - hc-network
 
+  # ── Payment Service ───────────────────────────────────────────────────────
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: hc-payment-service
+    restart: unless-stopped
+    env_file:
+      - ./services/payment-service/.env
+    depends_on:
+      - mongo
+      - appointment-service
+    volumes:
+      - ./services/payment-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+      
+      
+  # ── AI Suggestion Service ──────────────────────────────────────────────
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: hc-ai-service
+    restart: unless-stopped
+    env_file:
+      - ./services/ai-service/.env
+    depends_on:
+      - mongo
+      - doctor-service
+    volumes:
+      - ./services/ai-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+    # NOT exposed to the host — all traffic must go through the gateway
+
   # ── API Gateway ───────────────────────────────────────────────
   api-gateway:
     build:
@@ -177,11 +217,14 @@ services:
       - appointment-service
       - notification-service
       - telemedicine-service
+      - payment-service
+      - ai-service
     volumes:
       - ./services/api-gateway:/app
       - /app/node_modules
     networks:
       - hc-network
+
 
 # ── Volumes ────────────────────────────────────────────────────
 volumes:

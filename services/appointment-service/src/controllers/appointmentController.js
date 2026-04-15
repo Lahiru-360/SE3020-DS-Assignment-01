@@ -7,6 +7,8 @@ import {
   updateAppointmentStatusService,
   searchDoctorsService,
   getAppointmentByIdService,
+  updatePaymentStatusService,
+  deleteAppointmentInternalService,
 } from '../services/appointmentService.js';
 import { sendSuccess, sendError } from '../utils/responseHelper.js';
 
@@ -19,7 +21,7 @@ export const bookAppointment = async (req, res, next) => {
     const patientId = req.headers['x-user-id'];
     if (!patientId) return sendError(res, 'Unauthorized', 401);
 
-    const { doctorId, date, phase, notes, type } = req.body;
+    const { doctorId, date, phase, notes, type, consultationFee } = req.body;
 
     const appointment = await bookAppointmentService({
       patientId,
@@ -28,6 +30,7 @@ export const bookAppointment = async (req, res, next) => {
       phase,
       notes,
       type,
+      consultationFee,
     });
 
     return sendSuccess(res, appointment, 'Appointment booked successfully', 201);
@@ -133,3 +136,37 @@ export const updateAppointmentStatusInternal = async (req, res, next) => {
     next(e);
   }
 };
+
+// PATCH /api/appointments/internal/:id/payment — called by payment-service after webhook
+// Updates paymentStatus ('unpaid' | 'paid' | 'failed' | 'refunded') and optionally paymentId.
+export const updatePaymentStatusInternal = async (req, res, next) => {
+  try {
+    const { paymentStatus, paymentId } = req.body;
+    if (!paymentStatus && !paymentId) {
+      return sendError(res, 'paymentStatus or paymentId is required', 422);
+    }
+
+    const appointment = await getAppointmentByIdService(req.params.id);
+    if (!appointment) return sendError(res, 'Appointment not found', 404);
+
+    const updates = {};
+    if (paymentStatus) updates.paymentStatus = paymentStatus;
+    if (paymentId) updates.paymentId = paymentId;
+
+    const updated = await updatePaymentStatusService(req.params.id, updates);
+    return sendSuccess(res, updated, 'Appointment payment status updated');
+  } catch (e) {
+    next(e);
+  }
+};
+
+// DELETE /api/appointments/internal/:id — internal hard-delete (e.g. after payment failure)
+export const deleteAppointmentInternal = async (req, res, next) => {
+  try {
+    const deleted = await deleteAppointmentInternalService(req.params.id);
+    return sendSuccess(res, deleted, 'Appointment deleted');
+  } catch (e) {
+    next(e);
+  }
+};
+

@@ -13,6 +13,8 @@ export const findAppointmentsByDoctorId = (doctorId) =>
 export const updateAppointmentById = (id, updates) =>
   AppointmentModel.findByIdAndUpdate(id, updates, { new: true });
 
+export const deleteAppointmentById = (id) => AppointmentModel.findByIdAndDelete(id);
+
 // ─── Active bookings for a doctor on a specific date (for slot computation) ──
 // dateStr must be "YYYY-MM-DD". Queries pending + confirmed only — cancelled/
 // completed appointments do NOT occupy a slot.
@@ -28,6 +30,7 @@ export const findActiveBookingsForDoctorOnDate = (doctorId, dateStr) => {
     doctorId,
     date:   { $gte: start, $lte: end },
     status: { $in: ['pending', 'confirmed'] },
+    paymentStatus: { $ne: 'failed' },
   }).select('timeSlot');
 };
 
@@ -41,6 +44,7 @@ export const findActiveBookingForSlot = (doctorId, dateStr, timeSlot) => {
     date:     { $gte: start, $lte: end },
     timeSlot,
     status:   { $in: ['pending', 'confirmed'] },
+    paymentStatus: { $ne: 'failed' },
   });
 };
 
