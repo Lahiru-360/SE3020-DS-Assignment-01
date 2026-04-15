@@ -10,7 +10,7 @@ export const getSmartMatch = async (req, res, next) => {
     const aiAnalysis = await analyzeSymptoms(symptoms);
 
     // 2. Fetch doctors matching the suggested specialty
-    // Fault Tolerant Design: If doctor lookup fails, we still return the AI advice.
+
     let doctors = [];
     let lookupStatus = 'success';
 
