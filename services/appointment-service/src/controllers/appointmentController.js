@@ -8,6 +8,7 @@ import {
   searchDoctorsService,
   getAppointmentByIdService,
   updatePaymentStatusService,
+  deleteAppointmentInternalService,
 } from '../services/appointmentService.js';
 import { sendSuccess, sendError } from '../utils/responseHelper.js';
 
@@ -154,6 +155,16 @@ export const updatePaymentStatusInternal = async (req, res, next) => {
 
     const updated = await updatePaymentStatusService(req.params.id, updates);
     return sendSuccess(res, updated, 'Appointment payment status updated');
+  } catch (e) {
+    next(e);
+  }
+};
+
+// DELETE /api/appointments/internal/:id — internal hard-delete (e.g. after payment failure)
+export const deleteAppointmentInternal = async (req, res, next) => {
+  try {
+    const deleted = await deleteAppointmentInternalService(req.params.id);
+    return sendSuccess(res, deleted, 'Appointment deleted');
   } catch (e) {
     next(e);
   }

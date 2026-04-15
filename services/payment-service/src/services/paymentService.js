@@ -50,6 +50,21 @@ async function updateAppointmentPayment(appointmentId, updates) {
   );
 }
 
+async function deleteAppointmentRecord(appointmentId) {
+  try {
+    await axios.delete(
+      `${process.env.APPOINTMENT_SERVICE_URL}/api/appointments/internal/${appointmentId}`,
+      { headers: internalHeaders() }
+    );
+  } catch (err) {
+    if (err.response?.status === 404) return; // already deleted, fine
+    console.error('Failed to delete appointment', {
+      appointmentId,
+      error: err.message,
+    });
+  }
+}
+
 // ─── Confirm appointment status via existing internal route ──────────────────
 async function confirmAppointmentStatus(appointmentId) {
   await axios.patch(
@@ -239,8 +254,7 @@ export const handleWebhookService = async (rawBody, stripeSignature) => {
       webhookReceivedAt: new Date(),
     });
 
-    // Update appointment: paymentStatus → failed (appointment stays 'pending' so they can retry)
-    await updateAppointmentPayment(transaction.appointmentId, { paymentStatus: 'failed' });
+    await deleteAppointmentRecord(transaction.appointmentId);
 
     console.warn(`[PaymentService] Payment failed for appointment ${transaction.appointmentId}: ${failureReason}`);
   }
@@ -254,9 +268,19 @@ export const handleWebhookService = async (rawBody, stripeSignature) => {
       webhookReceivedAt: new Date(),
     });
 
-    // Update appointment record
-    await updateAppointmentPayment(transaction.appointmentId, { paymentStatus: 'refunded' });
-    await updateAppointmentStatus(transaction.appointmentId, 'cancelled');
+    // Update appointment record (may already be deleted by delete-first cancel flow)
+    try {
+      await updateAppointmentPayment(transaction.appointmentId, { paymentStatus: 'refunded' });
+      await updateAppointmentStatus(transaction.appointmentId, 'cancelled');
+    } catch (err) {
+      if (err.response?.status === 404) {
+        console.warn(
+          `[PaymentService] charge.refunded: appointment ${transaction.appointmentId} not found (already deleted).`
+        );
+      } else {
+        throw err;
+      }
+    }
 
     console.log(`[PaymentService] Refund processed for appointment ${transaction.appointmentId}`);
   }
@@ -308,10 +332,19 @@ export const refundPaymentService = async (appointmentId) => {
     status: 'refunded',
   });
 
-  // 3. Update appointment record: status -> cancelled, paymentStatus -> refunded
-  //    (internal calls to appointment-service)
-  await updateAppointmentPayment(appointmentId, { paymentStatus: 'refunded' });
-  await updateAppointmentStatus(appointmentId, 'cancelled');
+  // 3. Update appointment record if it still exists (cancel flow may delete first)
+  try {
+    await updateAppointmentPayment(appointmentId, { paymentStatus: 'refunded' });
+    await updateAppointmentStatus(appointmentId, 'cancelled');
+  } catch (err) {
+    if (err.response?.status === 404) {
+      console.warn(
+        `[PaymentService] Appointment ${appointmentId} not found for refund update (likely already deleted).`
+      );
+    } else {
+      throw err;
+    }
+  }
 
   return {
     refundId: stripeRefundId,

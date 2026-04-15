@@ -20,6 +20,7 @@ import {
   getAppointmentInternal,
   updateAppointmentStatusInternal,
   updatePaymentStatusInternal,
+  deleteAppointmentInternal,
 } from '../controllers/appointmentController.js';
 import {
   bookAppointmentValidators,
@@ -34,6 +35,7 @@ const router = Router();
 router.get('/internal/:id',            internalAuth, getAppointmentInternal);
 router.patch('/internal/:id/status',   internalAuth, updateAppointmentStatusInternal);
 router.patch('/internal/:id/payment',  internalAuth, updatePaymentStatusInternal);
+router.delete('/internal/:id',         internalAuth, deleteAppointmentInternal);
 
 // ── Patient-facing ────────────────────────────────────────────────────────────
 router.get('/doctors/search', searchDoctorsValidators, searchDoctors);
