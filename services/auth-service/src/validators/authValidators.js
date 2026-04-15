@@ -1,7 +1,5 @@
 import { body, param } from "express-validator";
 
-// ─── Reusable field validators ─────────────────────────────────
-
 const emailValidator = body("email")
   .isEmail()
   .withMessage("Valid email is required")
@@ -41,8 +39,6 @@ const phoneValidator = body("phone")
   .withMessage("Phone number is required")
   .matches(/^\+?[\d\s\-]{7,15}$/)
   .withMessage("Phone number must be a valid format (7–15 digits)");
-
-// ─── Route-level validator arrays ──────────────────────────────
 
 export const registerPatientValidators = [
   emailValidator,

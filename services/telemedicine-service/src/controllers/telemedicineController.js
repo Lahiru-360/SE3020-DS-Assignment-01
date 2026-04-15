@@ -1,8 +1,6 @@
 import { getOrCreateSessionService, endSessionService } from '../services/telemedicineService.js';
 import { sendSuccess, sendError } from '../utils/responseHelper.js';
 
-// GET /api/telemedicine/sessions/:appointmentId
-// Patient or doctor requests a meeting URL for a virtual appointment.
 export const getOrCreateSession = async (req, res, next) => {
   try {
     const userId    = req.headers['x-user-id'];
@@ -19,8 +17,6 @@ export const getOrCreateSession = async (req, res, next) => {
   }
 };
 
-// POST /api/telemedicine/sessions/:appointmentId/end
-// Doctor ends the active telemedicine session.
 export const endSession = async (req, res, next) => {
   try {
     const userId = req.headers['x-user-id'];

@@ -21,6 +21,7 @@ import {
   updateTransactionById,
 } from '../repositories/transactionRepository.js';
 import { createHttpError } from '../utils/httpError.js';
+import { publishPaymentEvent } from '../events/paymentPublisher.js';
 
 // Initialise Stripe with the secret key from env
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -46,30 +47,6 @@ async function updateAppointmentPayment(appointmentId, updates) {
   await axios.patch(
     `${process.env.APPOINTMENT_SERVICE_URL}/api/appointments/internal/${appointmentId}/payment`,
     updates,
-    { headers: internalHeaders() }
-  );
-}
-
-async function deleteAppointmentRecord(appointmentId) {
-  try {
-    await axios.delete(
-      `${process.env.APPOINTMENT_SERVICE_URL}/api/appointments/internal/${appointmentId}`,
-      { headers: internalHeaders() }
-    );
-  } catch (err) {
-    if (err.response?.status === 404) return; // already deleted, fine
-    console.error('Failed to delete appointment', {
-      appointmentId,
-      error: err.message,
-    });
-  }
-}
-
-// ─── Confirm appointment status via existing internal route ──────────────────
-async function confirmAppointmentStatus(appointmentId) {
-  await axios.patch(
-    `${process.env.APPOINTMENT_SERVICE_URL}/api/appointments/internal/${appointmentId}/status`,
-    { status: 'confirmed' },
     { headers: internalHeaders() }
   );
 }
@@ -233,12 +210,8 @@ export const handleWebhookService = async (rawBody, stripeSignature) => {
       webhookReceivedAt: new Date(),
     });
 
-    // Update appointment: paymentStatus → paid
-    await updateAppointmentPayment(transaction.appointmentId, { paymentStatus: 'paid' });
-
-    // Confirm the appointment via existing internal route
-    // This also triggers the notification-service (email/SMS to patient + doctor)
-    await confirmAppointmentStatus(transaction.appointmentId);
+    // Notify appointment-service via event — it will mark paymentStatus: paid and status: confirmed
+    publishPaymentEvent('payment_succeeded', { appointmentId: transaction.appointmentId });
 
     console.log(`[PaymentService] Payment completed for appointment ${transaction.appointmentId}`);
   }
@@ -254,33 +227,20 @@ export const handleWebhookService = async (rawBody, stripeSignature) => {
       webhookReceivedAt: new Date(),
     });
 
-    await deleteAppointmentRecord(transaction.appointmentId);
+    publishPaymentEvent('payment_failed', { appointmentId: transaction.appointmentId });
 
     console.warn(`[PaymentService] Payment failed for appointment ${transaction.appointmentId}: ${failureReason}`);
   }
 
   // ── Refund path (e.g. triggered from Stripe Dashboard) ──────────────────────
   if (event.type === 'charge.refunded') {
-    const charge = event.data.object;
-    
     await updateTransactionById(transaction._id, {
       status:            'refunded',
       webhookReceivedAt: new Date(),
     });
 
-    // Update appointment record (may already be deleted by delete-first cancel flow)
-    try {
-      await updateAppointmentPayment(transaction.appointmentId, { paymentStatus: 'refunded' });
-      await updateAppointmentStatus(transaction.appointmentId, 'cancelled');
-    } catch (err) {
-      if (err.response?.status === 404) {
-        console.warn(
-          `[PaymentService] charge.refunded: appointment ${transaction.appointmentId} not found (already deleted).`
-        );
-      } else {
-        throw err;
-      }
-    }
+    // Notify appointment-service via event — it will update paymentStatus and cancel the appointment
+    publishPaymentEvent('payment_refunded', { appointmentId: transaction.appointmentId });
 
     console.log(`[PaymentService] Refund processed for appointment ${transaction.appointmentId}`);
   }
@@ -332,32 +292,12 @@ export const refundPaymentService = async (appointmentId) => {
     status: 'refunded',
   });
 
-  // 3. Update appointment record if it still exists (cancel flow may delete first)
-  try {
-    await updateAppointmentPayment(appointmentId, { paymentStatus: 'refunded' });
-    await updateAppointmentStatus(appointmentId, 'cancelled');
-  } catch (err) {
-    if (err.response?.status === 404) {
-      console.warn(
-        `[PaymentService] Appointment ${appointmentId} not found for refund update (likely already deleted).`
-      );
-    } else {
-      throw err;
-    }
-  }
+  // 3. Notify appointment-service via event — it will update paymentStatus and cancel the appointment
+  publishPaymentEvent('payment_refunded', { appointmentId });
 
   return {
     refundId: stripeRefundId,
     status:   'refunded',
   };
 };
-
-// Internal status update helper
-async function updateAppointmentStatus(appointmentId, status) {
-  await axios.patch(
-    `${process.env.APPOINTMENT_SERVICE_URL}/api/appointments/internal/${appointmentId}/status`,
-    { status },
-    { headers: internalHeaders() }
-  );
-}
 

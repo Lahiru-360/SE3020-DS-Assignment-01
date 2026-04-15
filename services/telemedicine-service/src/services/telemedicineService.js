@@ -8,13 +8,13 @@ import {
 } from '../repositories/telemedicineRepository.js';
 import { createHttpError } from '../utils/httpError.js';
 import { buildJoinUrl } from '../utils/jaasHelper.js';
+import { publishSessionEnded } from '../events/sessionPublisher.js';
 
 const SESSION_WINDOW_MS = 60 * 60 * 1000; // 1 hour in milliseconds
 const SL_OFFSET_MS = (5 * 60 + 30) * 60 * 1000; // Sri Lanka UTC+5:30 in milliseconds
 
 const internalHeaders = () => ({ 'x-internal-secret': process.env.INTERNAL_SECRET });
 
-// ─── Fetch appointment from appointment-service ─────────────────────────────
 async function fetchAppointment(appointmentId) {
   try {
     const { data } = await axios.get(
@@ -28,9 +28,6 @@ async function fetchAppointment(appointmentId) {
   }
 }
 
-// ─── Derive scheduled datetime from appointment ─────────────────────────────
-// appointment.date is UTC midnight; appointment.timeSlot is stored in Sri Lanka
-// time (UTC+5:30) — convert to UTC by subtracting the SL offset.
 function getScheduledTime(appointment) {
   const [startTime] = appointment.timeSlot.split('-');
   const [hours, minutes] = startTime.split(':').map(Number);
@@ -40,7 +37,6 @@ function getScheduledTime(appointment) {
   return new Date(dateUtcMidnight.getTime() + slotMs - SL_OFFSET_MS);
 }
 
-// ─── Get or create a telemedicine session ───────────────────────────────────
 export const getOrCreateSessionService = async (appointmentId, userId, role, userEmail) => {  if (!mongoose.Types.ObjectId.isValid(appointmentId)) {
     throw createHttpError('Invalid appointment ID', 400);
   }
@@ -128,17 +124,7 @@ export const endSessionService = async (appointmentId, userId, role) => {
 
   const updated = await updateSessionStatusByAppointmentId(appointmentId, 'ENDED');
 
-  // Auto-update appointment status to 'completed'
-  try {
-    await axios.patch(
-      `${process.env.APPOINTMENT_SERVICE_URL}/api/appointments/internal/${appointmentId}/status`,
-      { status: 'completed' },
-      { headers: internalHeaders() }
-    );
-  } catch {
-    // Non-fatal: session is ended even if appointment update fails
-    console.error(`Failed to mark appointment ${appointmentId} as completed`);
-  }
+  publishSessionEnded(appointmentId);
 
   return updated;
 };
