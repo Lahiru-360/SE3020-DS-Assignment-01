@@ -213,6 +213,11 @@ services:
       - appointment-service
     volumes:
       - ./services/payment-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+      
+      
   # ── AI Suggestion Service ──────────────────────────────────────────────
   ai-service:
     build:
