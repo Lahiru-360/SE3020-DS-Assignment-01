@@ -1,0 +1,63 @@
+# =============================================================================
+# HC Platform — Kubernetes ConfigMap
+# =============================================================================
+# Non-sensitive configuration shared across services.
+# Service URLs use Kubernetes internal DNS:  http://<service-name>:<port>
+# These names resolve automatically within the "healthcare" namespace.
+#
+# Apply with:   kubectl apply -f k8s/configmap.yml
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hc-config
+  namespace: healthcare
+data:
+
+  # ---------------------------------------------------------------------------
+  # Internal service URLs — Kubernetes DNS resolves these automatically.
+  # Format: http://<k8s-service-name>:<container-port>
+  # These replace the Docker Compose container_name hostname references.
+  # ---------------------------------------------------------------------------
+  AUTH_SERVICE_URL:         "http://auth-service:5007"
+  PATIENT_SERVICE_URL:      "http://patient-service:5002"
+  DOCTOR_SERVICE_URL:       "http://doctor-service:5001"
+  APPOINTMENT_SERVICE_URL:  "http://appointment-service:5003"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:5004"
+  TELEMEDICINE_SERVICE_URL: "http://telemedicine-service:5005"
+  PAYMENT_SERVICE_URL:      "http://payment-service:5006"
+  AI_SERVICE_URL:           "http://ai-service:5008"
+
+  # ---------------------------------------------------------------------------
+  # auth-service
+  # ---------------------------------------------------------------------------
+  JWT_EXPIRES_IN:         "7d"
+  JWT_REFRESH_EXPIRES_IN: "30d"
+  ADMIN_DEFAULT_EMAIL:    "admin@system.com"
+
+  # ---------------------------------------------------------------------------
+  # notification-service — non-sensitive SMTP + Twilio config
+  # ---------------------------------------------------------------------------
+  EMAIL_HOST:                  "smtp.gmail.com"
+  EMAIL_PORT:                  "587"
+  EMAIL_USER:                   "cadilshaprathibha@gmail.com"
+  EMAIL_FROM:                   "HC Platform <cadilshaprathibha@gmail.com>"
+  TWILIO_MESSAGING_SERVICE_SID: "MGe1f73a9ce1ed6f816c244bd98781bbf1"
+
+  # ---------------------------------------------------------------------------
+  # appointment-service
+  # ---------------------------------------------------------------------------
+  TIMEZONE:               "Asia/Colombo"
+  SLOT_DURATION_MINUTES:  "20"
+
+  # ---------------------------------------------------------------------------
+  # ai-service — Gemini non-sensitive config
+  # ---------------------------------------------------------------------------
+  GEMINI_MODEL:    "gemini-1.5-flash"
+  GEMINI_BASE_URL: "https://generativelanguage.googleapis.com/v1beta/models"
+
+  # ---------------------------------------------------------------------------
+  # RabbitMQ infra — non-sensitive management config
+  # ---------------------------------------------------------------------------
+  RABBITMQ_DEFAULT_USER: "hcadmin"

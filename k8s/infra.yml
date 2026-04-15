@@ -1,0 +1,186 @@
+# =============================================================================
+# HC Platform — Infrastructure: MongoDB + RabbitMQ
+# =============================================================================
+# Both are StatefulSets (not Deployments) because they are stateful workloads
+# that require persistent identity and stable storage.
+#
+# PersistentVolumeClaims ensure data survives pod restarts.
+# On minikube, PVCs are backed by the host filesystem automatically.
+#
+# Apply with:   kubectl apply -f k8s/infra.yml
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# MongoDB PersistentVolumeClaim
+# ReadWriteOnce: one node mounts this volume at a time — correct for a single DB
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-pvc
+  namespace: healthcare
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+# -----------------------------------------------------------------------------
+# MongoDB StatefulSet
+# StatefulSet is used (rather than Deployment) because Mongo is stateful:
+# pod identity and volume binding must be stable across restarts.
+# -----------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+  namespace: healthcare
+spec:
+  serviceName: mongo
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:7
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongo-storage
+              mountPath: /data/db
+          readinessProbe:
+            exec:
+              command: ["mongosh", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: mongo-storage
+          persistentVolumeClaim:
+            claimName: mongo-pvc
+
+---
+
+# -----------------------------------------------------------------------------
+# MongoDB ClusterIP Service
+# Named "mongo" — all services connect via mongodb://mongo:27017
+# ClusterIP makes it reachable only within the cluster (internal only).
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+  namespace: healthcare
+spec:
+  selector:
+    app: mongo
+  ports:
+    - port: 27017
+      targetPort: 27017
+
+---
+
+# =============================================================================
+# RabbitMQ
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# RabbitMQ PersistentVolumeClaim
+# Ensures queues and messages survive pod restarts.
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rabbitmq-pvc
+  namespace: healthcare
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 512Mi
+
+---
+
+# -----------------------------------------------------------------------------
+# RabbitMQ StatefulSet
+# Uses the management-alpine image to include the management UI on port 15672.
+# Credentials are pulled from hc-secrets (RABBITMQ_DEFAULT_PASS)
+# and hc-config (RABBITMQ_DEFAULT_USER) to mirror docker-compose behaviour.
+# -----------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+  namespace: healthcare
+spec:
+  serviceName: rabbitmq
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3-management-alpine
+          ports:
+            - containerPort: 5672   # AMQP
+            - containerPort: 15672  # Management UI
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: hc-config
+                  key: RABBITMQ_DEFAULT_USER
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: hc-secrets
+                  key: RABBITMQ_DEFAULT_PASS
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "ping"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          volumeMounts:
+            - name: rabbitmq-storage
+              mountPath: /var/lib/rabbitmq
+      volumes:
+        - name: rabbitmq-storage
+          persistentVolumeClaim:
+            claimName: rabbitmq-pvc
+
+---
+
+# -----------------------------------------------------------------------------
+# RabbitMQ ClusterIP Service
+# Named "rabbitmq" — services connect via amqp://hcadmin:hcpassword@rabbitmq:5672
+# Port 15672 is exposed cluster-internally (use kubectl port-forward to access UI).
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: healthcare
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672
