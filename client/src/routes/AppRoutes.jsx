@@ -63,6 +63,13 @@ export const appRoutes = [
     hideChrome: true,
   },
   {
+    path: "/admin/doctors",
+    component: Admin,
+    requiresAuth: true,
+    allowedRoles: ["admin"],
+    hideChrome: true,
+  },
+  {
     path: "/admin/analytics",
     component: Admin,
     requiresAuth: true,

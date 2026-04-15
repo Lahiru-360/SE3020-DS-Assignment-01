@@ -1,33 +1,6 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Patient Service API Layer
-//
-// All requests are sent through the shared axiosInstance which:
-//   • Targets the API Gateway (VITE_API_BASE_URL or http://localhost:5000/api)
-//   • Automatically attaches the Bearer JWT token from localStorage
-//   • Handles global 401 errors by clearing tokens and redirecting to /login
-//
-// Backend routes (via API Gateway):
-//
-// [patient-service]
-//   PATCH /patients/me                          — update own profile (patient)
-//
-// [appointment-service — patient role]
-//   GET   /appointments/doctors/search          — search doctors (?specialization=&name=)
-//   POST  /appointments                         — book appointment
-//   GET   /appointments/my                      — patient's own appointments
-//   PATCH /appointments/:id/cancel              — cancel an appointment
-//
-// [doctor-service — availability (any authenticated)]
-//   GET   /availability/:doctorId               — get availability for a doctor
-//
-// [doctor-service — prescriptions]
-//   GET   /prescriptions/patient/:patientId     — patient's prescriptions
-//   GET   /prescriptions/:id/pdf                — download PDF as blob
-// ─────────────────────────────────────────────────────────────────────────────
-
 import axiosInstance from "./axiosInstance";
 
-// ── Patient Profile ───────────────────────────────────────────────────────
+// Patient Profile
 
 /**
  * Update the patient's own profile.
@@ -36,7 +9,7 @@ import axiosInstance from "./axiosInstance";
 export const updatePatientProfile = (data) =>
   axiosInstance.patch("/patients/me", data);
 
-// ── Doctor Search ─────────────────────────────────────────────────────────
+// Doctor Search
 
 /**
  * Search approved doctors.
@@ -50,7 +23,7 @@ export const searchDoctors = ({ specialization, name } = {}) => {
   return axiosInstance.get(`/appointments/doctors/search${qs ? `?${qs}` : ""}`);
 };
 
-// ── Availability ──────────────────────────────────────────────────────────
+// Availability
 
 /**
  * Get a doctor's availability schedule (array of date objects with timeslots).
@@ -59,7 +32,7 @@ export const searchDoctors = ({ specialization, name } = {}) => {
 export const getDoctorAvailability = (doctorId) =>
   axiosInstance.get(`/availability/${doctorId}`);
 
-// ── Appointments ──────────────────────────────────────────────────────────
+//  Appointments
 
 /**
  * Book an appointment with a doctor.
@@ -80,7 +53,7 @@ export const getMyAppointments = () => axiosInstance.get("/appointments/my");
 export const cancelMyAppointment = (appointmentId) =>
   axiosInstance.patch(`/appointments/${appointmentId}/cancel`);
 
-// ── Prescriptions ─────────────────────────────────────────────────────────
+//  Prescriptions
 
 /**
  * Get all prescriptions for the logged-in patient.

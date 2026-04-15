@@ -74,6 +74,7 @@ export default function Register() {
     // Doctor-only fields
     specialization: "",
     licenseNumber: "",
+    consultationFee: "",
   });
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
@@ -94,6 +95,7 @@ export default function Register() {
       role,
       specialization,
       licenseNumber,
+      consultationFee,
     } = form;
 
     const baseValid =
@@ -106,7 +108,13 @@ export default function Register() {
       role;
 
     const doctorValid =
-      role === "doctor" ? specialization.trim() && licenseNumber.trim() : true;
+      role === "doctor"
+        ? specialization.trim() &&
+          licenseNumber.trim() &&
+          consultationFee !== "" &&
+          !isNaN(Number(consultationFee)) &&
+          Number(consultationFee) >= 0
+        : true;
 
     setIsFormValid(!!(baseValid && doctorValid));
   }, [form, confirmPassword]);
@@ -166,6 +174,7 @@ export default function Register() {
       ...(isDoctor && {
         specialization: form.specialization,
         licenseNumber: form.licenseNumber,
+        consultationFee: Number(form.consultationFee),
       }),
     };
 
@@ -207,7 +216,7 @@ export default function Register() {
               Create Your Account
             </h1>
             <p className="mt-2 text-sm text-text-secondary">
-              Join SafeMother to get started
+              Join Care Link to get started
             </p>
           </div>
 
@@ -290,26 +299,37 @@ export default function Register() {
 
             {/* Doctor-only fields */}
             {isDoctor && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormInput
+                    id="specialization"
+                    label="Specialization"
+                    type="text"
+                    value={form.specialization}
+                    onChange={handleChange}
+                    placeholder="e.g. Obstetrics"
+                    required
+                  />
+                  <FormInput
+                    id="licenseNumber"
+                    label="License Number"
+                    type="text"
+                    value={form.licenseNumber}
+                    onChange={handleChange}
+                    placeholder="e.g. SLMC-12345"
+                    required
+                  />
+                </div>
                 <FormInput
-                  id="specialization"
-                  label="Specialization"
-                  type="text"
-                  value={form.specialization}
+                  id="consultationFee"
+                  label="Consultation Fee (LKR)"
+                  type="number"
+                  value={form.consultationFee}
                   onChange={handleChange}
-                  placeholder="e.g. Obstetrics"
+                  placeholder="e.g. 2500"
                   required
                 />
-                <FormInput
-                  id="licenseNumber"
-                  label="License Number"
-                  type="text"
-                  value={form.licenseNumber}
-                  onChange={handleChange}
-                  placeholder="e.g. SLMC-12345"
-                  required
-                />
-              </div>
+              </>
             )}
 
             {/* ROW — Password | Confirm Password */}
