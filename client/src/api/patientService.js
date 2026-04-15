@@ -71,8 +71,7 @@ export const bookAppointment = (data) =>
 /**
  * Get the patient's own appointments.
  */
-export const getMyAppointments = () =>
-  axiosInstance.get("/appointments/my");
+export const getMyAppointments = () => axiosInstance.get("/appointments/my");
 
 /**
  * Cancel an appointment.

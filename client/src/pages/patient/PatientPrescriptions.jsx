@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/useAuth";
-import { getPatientPrescriptions, downloadPrescriptionPdf } from "../../api/patientService";
+import {
+  getPatientPrescriptions,
+  downloadPrescriptionPdf,
+} from "../../api/patientService";
 import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 import StatusBadge from "../../components/ui/StatusBadge";
@@ -102,8 +105,12 @@ function PrescriptionDetailModal({ prescription, onClose }) {
           {/* Notes */}
           {prescription.notes && (
             <div className="rounded-lg bg-bg-main border border-border px-4 py-3">
-              <p className="text-xs text-text-muted mb-1">Doctor&apos;s Notes</p>
-              <p className="text-sm text-text-secondary">{prescription.notes}</p>
+              <p className="text-xs text-text-muted mb-1">
+                Doctor&apos;s Notes
+              </p>
+              <p className="text-sm text-text-secondary">
+                {prescription.notes}
+              </p>
             </div>
           )}
 
@@ -130,9 +137,7 @@ function PrescriptionDetailModal({ prescription, onClose }) {
                   </div>
                   <div>
                     <p className="text-[11px] text-text-muted">Frequency</p>
-                    <p className="text-sm text-text-primary">
-                      {med.frequency}
-                    </p>
+                    <p className="text-sm text-text-primary">{med.frequency}</p>
                   </div>
                   <div>
                     <p className="text-[11px] text-text-muted">Duration</p>

@@ -90,9 +90,7 @@ function DoctorCard({ doctor, onSelect }) {
           Consultation fee: LKR {doctor.consultationFee}
         </p>
       )}
-      <p className="text-[11px] text-primary font-medium mt-1">
-        Tap to book →
-      </p>
+      <p className="text-[11px] text-primary font-medium mt-1">Tap to book →</p>
     </div>
   );
 }
@@ -220,10 +218,8 @@ function AppointmentDetailModal({
     }
   };
 
-  const hasPrescription =
-    prescription !== null && prescription !== "none";
-  const canCancel =
-    appt.status === "pending" || appt.status === "confirmed";
+  const hasPrescription = prescription !== null && prescription !== "none";
+  const canCancel = appt.status === "pending" || appt.status === "confirmed";
 
   return (
     <div
@@ -345,8 +341,7 @@ function AppointmentDetailModal({
 // ── AppointmentCard ────────────────────────────────────────────────────────
 
 function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
-  const canCancel =
-    appt.status === "pending" || appt.status === "confirmed";
+  const canCancel = appt.status === "pending" || appt.status === "confirmed";
 
   return (
     <div
@@ -366,7 +361,9 @@ function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
               </span>
             )}
           </p>
-          <p className="text-xs text-text-muted mt-0.5">{appt.type ?? "PHYSICAL"}</p>
+          <p className="text-xs text-text-muted mt-0.5">
+            {appt.type ?? "PHYSICAL"}
+          </p>
         </div>
         <StatusBadge status={appt.status} />
       </div>
@@ -376,10 +373,7 @@ function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
       )}
 
       {canCancel && (
-        <div
-          className="flex justify-end"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
             onClick={() => onCancel(appt._id)}
@@ -692,9 +686,6 @@ export default function PatientAppointments() {
           cancelling={cancelling}
         />
       )}
-
     </div>
   );
 }
-
-

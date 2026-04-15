@@ -9,7 +9,10 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import DashboardLayout from "../../components/layout/DashboardLayout";
-import { getDoctorAvailability, bookAppointment } from "../../api/patientService";
+import {
+  getDoctorAvailability,
+  bookAppointment,
+} from "../../api/patientService";
 import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 
@@ -157,7 +160,6 @@ export default function PatientBookingPage() {
   return (
     <DashboardLayout navItems={PATIENT_NAV}>
       <div className="max-w-3xl mx-auto space-y-6">
-
         {/* ── Page header ─────────────────────────────────────────────── */}
         <div className="flex items-start gap-3">
           <button
@@ -330,7 +332,9 @@ export default function PatientBookingPage() {
                                 </p>
                               </div>
                               <div>
-                                <p className="text-text-muted mb-0.5">Session</p>
+                                <p className="text-text-muted mb-0.5">
+                                  Session
+                                </p>
                                 <p className="text-text-primary font-medium capitalize">
                                   {slot.phase}
                                 </p>

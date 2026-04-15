@@ -8,8 +8,8 @@ const Admin = lazy(() => import("../pages/Admin"));
 const NotFound = lazy(() => import("../pages/NotFound"));
 const User = lazy(() => import("../pages/Mother"));
 const Doctor = lazy(() => import("../pages/Doctor"));
-const PatientBookingPage = lazy(() =>
-  import("../pages/patient/PatientBookingPage"),
+const PatientBookingPage = lazy(
+  () => import("../pages/patient/PatientBookingPage"),
 );
 
 export const appRoutes = [
