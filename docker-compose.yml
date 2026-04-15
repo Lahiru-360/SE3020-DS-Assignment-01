@@ -1,12 +1,14 @@
-version: '3.9'
-
 # ─────────────────────────────────────────────────────────────────
 # HC Platform — Docker Compose
 #
 # Currently registered services:
-#   api-gateway   → port 5000  (public entry point)
-#   auth-service  → port 5007  (internal only)
-#   mongo         → port 27017 (internal only)
+#   api-gateway           → port 5000  (public entry point)
+#   auth-service          → port 5007  (internal only)
+#   patient-service       → port 5002  (internal only)
+#   doctor-service        → port 5001  (internal only)
+#   appointment-service   → port 5003  (internal only)
+#   notification-service  → port 5004  (internal only)
+#   mongo                 → port 27017 (internal only)
 #
 # Add a new service block here each time a new microservice is built.
 # Pattern to follow:
@@ -17,14 +19,13 @@ version: '3.9'
 # ─────────────────────────────────────────────────────────────────
 
 services:
-
   # ── MongoDB ───────────────────────────────────────────────────
   mongo:
     image: mongo:7
     container_name: hc-mongo
     restart: unless-stopped
     ports:
-      - "27017:27017"         # expose for local tools (Compass, mongosh)
+      - "27017:27017" # expose for local tools (Compass, mongosh)
     volumes:
       - mongo_data:/data/db
     networks:
@@ -38,7 +39,7 @@ services:
     container_name: hc-auth-service
     restart: unless-stopped
     env_file:
-      - ./services/auth-service/.env.example   # replace with .env in production
+      - ./services/auth-service/.env.example # replace with .env in production
     environment:
       PORT: 5007
       MONGO_URI: mongodb://mongo:27017/auth-service
@@ -47,10 +48,14 @@ services:
       JWT_REFRESH_EXPIRES_IN: 30d
       PATIENT_SERVICE_URL: http://patient-service:5002
       DOCTOR_SERVICE_URL: http://doctor-service:5001
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
     depends_on:
       - mongo
       - patient-service
       - doctor-service
+    volumes:
+      - ./services/auth-service:/app
+      - /app/node_modules
     networks:
       - hc-network
     # NOT exposed to the host — all traffic must go through the gateway
@@ -63,12 +68,17 @@ services:
     container_name: hc-patient-service
     restart: unless-stopped
     env_file:
-      - ./services/patient-service/.env.example   # replace with .env in production
+      - ./services/patient-service/.env.example # replace with .env in production
     environment:
       PORT: 5002
       MONGO_URI: mongodb://mongo:27017/patient-service
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
+      # The env_file will supply SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
     depends_on:
       - mongo
+    volumes:
+      - ./services/patient-service:/app
+      - /app/node_modules
     networks:
       - hc-network
     # NOT exposed to the host — called internally by auth-service only
@@ -81,15 +91,104 @@ services:
     container_name: hc-doctor-service
     restart: unless-stopped
     env_file:
-      - ./services/doctor-service/.env.example    # replace with .env in production
+      - ./services/doctor-service/.env.example # replace with .env in production
     environment:
       PORT: 5001
       MONGO_URI: mongodb://mongo:27017/doctor-service
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
+      APPOINTMENT_SERVICE_URL: http://appointment-service:5003
+      PATIENT_SERVICE_URL: http://patient-service:5002
     depends_on:
       - mongo
+    volumes:
+      - ./services/doctor-service:/app
+      - /app/node_modules
     networks:
       - hc-network
     # NOT exposed to the host — called internally by auth-service only
+
+  # ── Appointment Service ───────────────────────────────────────
+  appointment-service:
+    build:
+      context: ./services/appointment-service
+      dockerfile: Dockerfile
+    container_name: hc-appointment-service
+    restart: unless-stopped
+    env_file:
+      - ./services/appointment-service/.env.example # replace with .env in production
+    environment:
+      PORT: 5003
+      MONGO_URI: mongodb://mongo:27017/appointment-service
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
+      DOCTOR_SERVICE_URL: http://doctor-service:5001
+      PATIENT_SERVICE_URL: http://patient-service:5002
+      NOTIFICATION_SERVICE_URL: http://notification-service:5004
+      SLOT_DURATION_MINUTES: ${SLOT_DURATION_MINUTES:-20}
+    depends_on:
+      - mongo
+      - doctor-service
+      - patient-service
+      - notification-service
+    volumes:
+      - ./services/appointment-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+    # NOT exposed to the host — all traffic must go through the gateway
+
+  # ── Notification Service ──────────────────────────────────────
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: hc-notification-service
+    restart: unless-stopped
+    env_file:
+      - ./services/notification-service/.env.example # replace with .env in production
+    environment:
+      PORT: 5004
+      MONGO_URI: mongodb://mongo:27017/notification-service
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USER: ${EMAIL_USER:-your_email@gmail.com}
+      EMAIL_PASS: ${EMAIL_PASS:-your_app_password}
+      EMAIL_FROM: ${EMAIL_FROM:-HC Platform <no-reply@hcplatform.com>}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-your_twilio_auth_token}
+      TWILIO_MESSAGING_SERVICE_SID: ${TWILIO_MESSAGING_SERVICE_SID:-MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+    depends_on:
+      - mongo
+    volumes:
+      - ./services/notification-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+    # NOT exposed to the host — triggered internally by appointment-service
+
+  # ── Telemedicine Service ──────────────────────────────────────────────────
+  telemedicine-service:
+    build:
+      context: ./services/telemedicine-service
+      dockerfile: Dockerfile
+    container_name: hc-telemedicine-service
+    restart: unless-stopped
+    env_file:
+      - ./services/telemedicine-service/.env.example
+    environment:
+      PORT: 5005
+      MONGO_URI: mongodb://mongo:27017/telemedicine-service
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
+      APPOINTMENT_SERVICE_URL: http://appointment-service:5003
+    depends_on:
+      - mongo
+      - appointment-service
+    volumes:
+      - ./services/telemedicine-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+    # NOT exposed to the host — all traffic must go through the gateway
 
   # ── API Gateway ───────────────────────────────────────────────
   api-gateway:
@@ -99,15 +198,26 @@ services:
     container_name: hc-api-gateway
     restart: unless-stopped
     ports:
-      - "5000:5000"           # single public-facing port
+      - "5000:5000" # single public-facing port
     environment:
       PORT: 5000
       JWT_SECRET: ${JWT_SECRET:-your_super_secret_jwt_key_change_in_production}
       AUTH_SERVICE_URL: http://auth-service:5007
+      PATIENT_SERVICE_URL: http://patient-service:5002
+      DOCTOR_SERVICE_URL: http://doctor-service:5001
+      APPOINTMENT_SERVICE_URL: http://appointment-service:5003
+      NOTIFICATION_SERVICE_URL: http://notification-service:5004
+      TELEMEDICINE_SERVICE_URL: http://telemedicine-service:5005
     depends_on:
       - auth-service
       - patient-service
       - doctor-service
+      - appointment-service
+      - notification-service
+      - telemedicine-service
+    volumes:
+      - ./services/api-gateway:/app
+      - /app/node_modules
     networks:
       - hc-network
 
