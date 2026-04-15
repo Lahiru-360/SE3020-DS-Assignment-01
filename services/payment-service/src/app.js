@@ -14,9 +14,12 @@ import { startAppointmentCancelledConsumer } from './events/appointmentCancelled
 
 connectDB();
 
-connectRabbitMQ()
-  .then(startAppointmentCancelledConsumer)
-  .catch((err) => console.error('[RabbitMQ] Failed to start appointment cancelled consumer:', err.message));
+// Connect to RabbitMQ and start the appointment cancelled consumer.
+// connectRabbitMQ retries indefinitely — the callback runs each time a fresh
+// connection is established, including after mid-runtime reconnects.
+connectRabbitMQ(async () => {
+  await startAppointmentCancelledConsumer();
+});
 
 const app = express();
 

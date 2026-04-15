@@ -1,25 +1,6 @@
-# =============================================================================
-# HC Platform — Application Services (8 backend services)
-# =============================================================================
-# Each service consists of two Kubernetes resources, separated by ---:
-#   1. Deployment  — manages pod lifecycle, image, env vars, probes
-#   2. Service     — stable ClusterIP DNS name for internal communication
-#
-# Env var strategy per Deployment:
-#   envFrom: configMapRef  → injects all ConfigMap keys as env vars in one shot
-#   env: (individual)      → injects per-service secrets and the PORT override
-#
-# imagePullPolicy: IfNotPresent — uses locally built images (for minikube /
-#   Docker Desktop). Change to Always when pushing to a container registry.
-#
-# Apply with:   kubectl apply -f k8s/services.yml
-# =============================================================================
+# Application Services
 
-
-# =============================================================================
-# 1. auth-service  (port 5007)
-# Dependencies: mongo, patient-service, doctor-service
-# =============================================================================
+# auth-service
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -95,10 +76,7 @@ spec:
       targetPort: 5007
 
 
-# =============================================================================
-# 2. patient-service  (port 5002)
-# Dependencies: mongo, supabase (external)
-# =============================================================================
+# patient-service
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -175,10 +153,7 @@ spec:
       targetPort: 5002
 
 
-# =============================================================================
-# 3. doctor-service  (port 5001)
-# Dependencies: mongo, appointment-service, patient-service
-# =============================================================================
+# doctor-service
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -245,10 +220,7 @@ spec:
       targetPort: 5001
 
 
-# =============================================================================
-# 4. appointment-service  (port 5003)
-# Dependencies: mongo, rabbitmq, doctor-service, patient-service
-# =============================================================================
+# appointment-service
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -320,10 +292,7 @@ spec:
       targetPort: 5003
 
 
-# =============================================================================
-# 5. notification-service  (port 5004)
-# Dependencies: mongo, rabbitmq, email (external), twilio (external)
-# =============================================================================
+# notification-service
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -410,10 +379,7 @@ spec:
       targetPort: 5004
 
 
-# =============================================================================
-# 6. telemedicine-service  (port 5005)
-# Dependencies: mongo, rabbitmq, appointment-service, JaaS (external)
-# =============================================================================
+# telemedicine-service
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -500,10 +466,7 @@ spec:
       targetPort: 5005
 
 
-# =============================================================================
-# 7. payment-service  (port 5006)
-# Dependencies: mongo, rabbitmq, appointment-service, Stripe (external)
-# =============================================================================
+# payment-service
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -585,11 +548,7 @@ spec:
       targetPort: 5006
 
 
-# =============================================================================
-# 8. ai-service  (port 5008)
-# Dependencies: doctor-service (HTTP), Gemini API (external)
-# Note: no MongoDB dependency — this service is stateless
-# =============================================================================
+# ai-service
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -1,19 +1,6 @@
-# =============================================================================
-# HC Platform — Infrastructure: MongoDB + RabbitMQ
-# =============================================================================
-# Both are StatefulSets (not Deployments) because they are stateful workloads
-# that require persistent identity and stable storage.
-#
-# PersistentVolumeClaims ensure data survives pod restarts.
-# On minikube, PVCs are backed by the host filesystem automatically.
-#
-# Apply with:   kubectl apply -f k8s/infra.yml
-# =============================================================================
+# Infrastructure: MongoDB + RabbitMQ
 
-# -----------------------------------------------------------------------------
-# MongoDB PersistentVolumeClaim
-# ReadWriteOnce: one node mounts this volume at a time — correct for a single DB
-# -----------------------------------------------------------------------------
+# MongoDB PVC
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -28,11 +15,7 @@ spec:
 
 ---
 
-# -----------------------------------------------------------------------------
 # MongoDB StatefulSet
-# StatefulSet is used (rather than Deployment) because Mongo is stateful:
-# pod identity and volume binding must be stable across restarts.
-# -----------------------------------------------------------------------------
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -69,11 +52,7 @@ spec:
 
 ---
 
-# -----------------------------------------------------------------------------
-# MongoDB ClusterIP Service
-# Named "mongo" — all services connect via mongodb://mongo:27017
-# ClusterIP makes it reachable only within the cluster (internal only).
-# -----------------------------------------------------------------------------
+# MongoDB Service
 apiVersion: v1
 kind: Service
 metadata:
@@ -88,14 +67,9 @@ spec:
 
 ---
 
-# =============================================================================
 # RabbitMQ
-# =============================================================================
 
-# -----------------------------------------------------------------------------
-# RabbitMQ PersistentVolumeClaim
-# Ensures queues and messages survive pod restarts.
-# -----------------------------------------------------------------------------
+# RabbitMQ PVC
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -110,12 +84,7 @@ spec:
 
 ---
 
-# -----------------------------------------------------------------------------
 # RabbitMQ StatefulSet
-# Uses the management-alpine image to include the management UI on port 15672.
-# Credentials are pulled from hc-secrets (RABBITMQ_DEFAULT_PASS)
-# and hc-config (RABBITMQ_DEFAULT_USER) to mirror docker-compose behaviour.
-# -----------------------------------------------------------------------------
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -164,11 +133,7 @@ spec:
 
 ---
 
-# -----------------------------------------------------------------------------
-# RabbitMQ ClusterIP Service
-# Named "rabbitmq" — services connect via amqp://hcadmin:hcpassword@rabbitmq:5672
-# Port 15672 is exposed cluster-internally (use kubectl port-forward to access UI).
-# -----------------------------------------------------------------------------
+# RabbitMQ Service
 apiVersion: v1
 kind: Service
 metadata:

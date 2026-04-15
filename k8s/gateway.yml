@@ -1,18 +1,4 @@
-# =============================================================================
-# HC Platform — API Gateway (public entrypoint)
-# =============================================================================
-# The api-gateway is the ONLY service exposed outside the cluster.
-# All other services are ClusterIP (internal only).
-#
-# Service type: NodePort — exposes port 5000 on the cluster node's IP.
-#   - minikube:         access at $(minikube ip):30500
-#   - Docker Desktop:   access at localhost:30500
-#
-# The api-gateway needs JWT_SECRET to validate tokens on incoming requests,
-# and all downstream service URLs to proxy requests to the correct service.
-#
-# Apply with:   kubectl apply -f k8s/gateway.yml
-# =============================================================================
+# API Gateway
 
 apiVersion: apps/v1
 kind: Deployment
@@ -61,11 +47,7 @@ spec:
 
 ---
 
-# -----------------------------------------------------------------------------
 # API Gateway NodePort Service
-# NodePort 30500 is the stable external port to hit from your browser or
-# Postman. It forwards to port 5000 inside the pod.
-# -----------------------------------------------------------------------------
 apiVersion: v1
 kind: Service
 metadata:
