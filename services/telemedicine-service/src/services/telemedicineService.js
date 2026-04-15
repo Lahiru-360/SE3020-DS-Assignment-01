@@ -15,7 +15,6 @@ const SL_OFFSET_MS = (5 * 60 + 30) * 60 * 1000; // Sri Lanka UTC+5:30 in millise
 
 const internalHeaders = () => ({ 'x-internal-secret': process.env.INTERNAL_SECRET });
 
-// ─── Fetch appointment from appointment-service ─────────────────────────────
 async function fetchAppointment(appointmentId) {
   try {
     const { data } = await axios.get(
@@ -29,9 +28,6 @@ async function fetchAppointment(appointmentId) {
   }
 }
 
-// ─── Derive scheduled datetime from appointment ─────────────────────────────
-// appointment.date is UTC midnight; appointment.timeSlot is stored in Sri Lanka
-// time (UTC+5:30) — convert to UTC by subtracting the SL offset.
 function getScheduledTime(appointment) {
   const [startTime] = appointment.timeSlot.split('-');
   const [hours, minutes] = startTime.split(':').map(Number);
@@ -41,7 +37,6 @@ function getScheduledTime(appointment) {
   return new Date(dateUtcMidnight.getTime() + slotMs - SL_OFFSET_MS);
 }
 
-// ─── Get or create a telemedicine session ───────────────────────────────────
 export const getOrCreateSessionService = async (appointmentId, userId, role, userEmail) => {  if (!mongoose.Types.ObjectId.isValid(appointmentId)) {
     throw createHttpError('Invalid appointment ID', 400);
   }
@@ -129,8 +124,6 @@ export const endSessionService = async (appointmentId, userId, role) => {
 
   const updated = await updateSessionStatusByAppointmentId(appointmentId, 'ENDED');
 
-  // Publish session.ended event — appointment-service consumes this and marks
-  // the appointment as "completed" without a direct HTTP call back here.
   publishSessionEnded(appointmentId);
 
   return updated;

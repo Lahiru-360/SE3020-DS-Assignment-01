@@ -7,10 +7,16 @@ import cors from 'cors';
 import morgan from 'morgan';
 
 import { connectDB } from './config/db.js';
+import { connectRabbitMQ } from './config/rabbitmq.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { startAppointmentCancelledConsumer } from './events/appointmentCancelledConsumer.js';
 
 connectDB();
+
+connectRabbitMQ()
+  .then(startAppointmentCancelledConsumer)
+  .catch((err) => console.error('[RabbitMQ] Failed to start appointment cancelled consumer:', err.message));
 
 const app = express();
 

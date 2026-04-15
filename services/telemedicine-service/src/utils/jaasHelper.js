@@ -1,13 +1,5 @@
 import jwt from 'jsonwebtoken';
 
-/**
- * Generates a JaaS (8x8.vc) JWT for a specific user joining a room.
- *
- * Required env vars:
- *   JAAS_APP_ID      — your JaaS App ID (e.g. "vpaas-magic-cookie-abc123")
- *   JAAS_API_KEY_ID  — the key ID shown in the JaaS dashboard
- *   JAAS_PRIVATE_KEY — the full PEM private key (newlines encoded as \n in .env)
- */
 export const generateJaasJwt = ({ userId, userEmail, userName, isModerator, roomName }) => {
   const appId      = process.env.JAAS_APP_ID;
   const apiKeyId   = process.env.JAAS_API_KEY_ID;
@@ -50,9 +42,6 @@ export const generateJaasJwt = ({ userId, userEmail, userName, isModerator, room
   });
 };
 
-/**
- * Builds the full JaaS join URL with embedded JWT for a given user.
- */
 export const buildJoinUrl = ({ roomName, userId, userEmail, userName, isModerator }) => {
   const appId = process.env.JAAS_APP_ID;
   const token = generateJaasJwt({ userId, userEmail, userName, isModerator, roomName });

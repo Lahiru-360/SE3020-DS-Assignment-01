@@ -184,20 +184,8 @@ export const cancelAppointmentService = async (appointmentId, userId, role) => {
 
   if (appt.paymentStatus === 'paid') {
     const deleted = await deleteAppointmentById(appointmentId);
-    try {
-      await axios.post(
-        `${process.env.PAYMENT_SERVICE_URL}/api/payments/internal/refund/${appointmentId}`,
-        {},
-        { headers: internalHeaders() }
-      );
-    } catch (err) {
-      console.error('[AppointmentService] Refund failed', {
-        appointmentId,
-        paymentId: appt.paymentId,
-        error: err.message,
-      });
-      // do NOT throw — cancel still succeeds
-    }
+    // Publish appointment.cancelled — payment-service consumes this event
+    // and triggers the Stripe refund automatically via RabbitMQ.
     notifyBoth('appointment_cancelled', appt).catch((err) =>
       console.warn('[AppointmentService] notifyBoth error (cancelled):', err.message)
     );

@@ -1,35 +1,11 @@
-# ─────────────────────────────────────────────────────────────────
-# HC Platform — Docker Compose
-#
-# Environment strategy:
-#   Each service has its own .env file (gitignored) with ALL its
-#   variables. Docker Compose loads them via env_file — no
-#   environment: overrides. Copy .env.example → .env and fill in
-#   real values before first run.
-#
-# Currently registered services:
-#   api-gateway           → port 5000  (public entry point)
-#   auth-service          → port 5007  (internal only)
-#   patient-service       → port 5002  (internal only)
-#   doctor-service        → port 5001  (internal only)
-#   appointment-service   → port 5003  (internal only)
-#   notification-service  → port 5004  (internal only)
-#   telemedicine-service  → port 5005  (internal only)
-#   payment-service       → port 5006  (internal only)
-#   ai-service            → port 5008  (internal only)
-#   rabbitmq              → port 5672  (AMQP) / 15672 (management UI)
-#   mongo                 → port 27017 (internal only)
-# ─────────────────────────────────────────────────────────────────
-
 services:
-  # ── RabbitMQ ───────────────────────────────────────────────────
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: hc-rabbitmq
     restart: unless-stopped
     ports:
-      - "5672:5672"   # AMQP protocol (used by services)
-      - "15672:15672" # Management UI — http://localhost:15672
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: hcadmin
       RABBITMQ_DEFAULT_PASS: hcpassword
@@ -38,19 +14,17 @@ services:
     networks:
       - hc-network
 
-  # ── MongoDB ───────────────────────────────────────────────────
   mongo:
     image: mongo:7
     container_name: hc-mongo
     restart: unless-stopped
     ports:
-      - "27017:27017" # expose for local tools (Compass, mongosh)
+      - "27017:27017"
     volumes:
       - mongo_data:/data/db
     networks:
       - hc-network
 
-  # ── Auth Service ──────────────────────────────────────────────
   auth-service:
     build:
       context: ./services/auth-service
@@ -69,7 +43,6 @@ services:
     networks:
       - hc-network
 
-  # ── Patient Service ───────────────────────────────────────────
   patient-service:
     build:
       context: ./services/patient-service
@@ -86,7 +59,6 @@ services:
     networks:
       - hc-network
 
-  # ── Doctor Service ────────────────────────────────────────────
   doctor-service:
     build:
       context: ./services/doctor-service
@@ -103,7 +75,6 @@ services:
     networks:
       - hc-network
 
-  # ── Appointment Service ───────────────────────────────────────
   appointment-service:
     build:
       context: ./services/appointment-service
@@ -124,7 +95,6 @@ services:
     networks:
       - hc-network
 
-  # ── Notification Service ──────────────────────────────────────
   notification-service:
     build:
       context: ./services/notification-service
@@ -142,7 +112,6 @@ services:
     networks:
       - hc-network
 
-  # ── Telemedicine Service ──────────────────────────────────────
   telemedicine-service:
     build:
       context: ./services/telemedicine-service
@@ -161,7 +130,6 @@ services:
     networks:
       - hc-network
 
-  # ── Payment Service ───────────────────────────────────────────────────────
   payment-service:
     build:
       context: ./services/payment-service
@@ -172,15 +140,14 @@ services:
       - ./services/payment-service/.env
     depends_on:
       - mongo
+      - rabbitmq
       - appointment-service
     volumes:
       - ./services/payment-service:/app
       - /app/node_modules
     networks:
       - hc-network
-      
-      
-  # ── AI Suggestion Service ──────────────────────────────────────────────
+
   ai-service:
     build:
       context: ./services/ai-service
@@ -197,9 +164,7 @@ services:
       - /app/node_modules
     networks:
       - hc-network
-    # NOT exposed to the host — all traffic must go through the gateway
 
-  # ── API Gateway ───────────────────────────────────────────────
   api-gateway:
     build:
       context: ./services/api-gateway
@@ -207,7 +172,7 @@ services:
     container_name: hc-api-gateway
     restart: unless-stopped
     ports:
-      - "5000:5000" # single public-facing port
+      - "5000:5000"
     env_file:
       - ./services/api-gateway/.env
     depends_on:
@@ -226,14 +191,12 @@ services:
       - hc-network
 
 
-# ── Volumes ────────────────────────────────────────────────────
 volumes:
   mongo_data:
     driver: local
   rabbitmq_data:
     driver: local
 
-# ── Networks ───────────────────────────────────────────────────
 networks:
   hc-network:
     driver: bridge

@@ -1,11 +1,9 @@
 import amqplib from 'amqplib';
 
-
 export const EXCHANGE = 'hc.platform.events';
 
 let channel = null;
 
-// ─── Connect with startup retry ─────────────────────────────────────────────
 export const connectRabbitMQ = async (maxRetries = 10, retryIntervalMs = 3000) => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -16,18 +14,18 @@ export const connectRabbitMQ = async (maxRetries = 10, retryIntervalMs = 3000) =
       await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
 
       connection.on('error', (err) =>
-        console.error('[RabbitMQ][telemedicine-service] Connection error:', err.message)
+        console.error('[RabbitMQ][payment-service] Connection error:', err.message)
       );
       connection.on('close', () => {
-        console.warn('[RabbitMQ][telemedicine-service] Connection closed');
+        console.warn('[RabbitMQ][payment-service] Connection closed');
         channel = null;
       });
 
-      console.log('[RabbitMQ][telemedicine-service] Connected to', process.env.RABBITMQ_URL);
+      console.log('[RabbitMQ][payment-service] Connected to', process.env.RABBITMQ_URL);
       return channel;
     } catch (err) {
       console.warn(
-        `[RabbitMQ][telemedicine-service] Attempt ${attempt}/${maxRetries} failed: ${err.message}.` +
+        `[RabbitMQ][payment-service] Attempt ${attempt}/${maxRetries} failed: ${err.message}.` +
           (attempt < maxRetries ? ` Retrying in ${retryIntervalMs / 1000}s...` : ' Giving up.')
       );
       if (attempt < maxRetries) {
@@ -35,7 +33,7 @@ export const connectRabbitMQ = async (maxRetries = 10, retryIntervalMs = 3000) =
       }
     }
   }
-  throw new Error('[RabbitMQ][telemedicine-service] Could not connect after all retries');
+  throw new Error('[RabbitMQ][payment-service] Could not connect after all retries');
 };
 
 export const getChannel = () => channel;

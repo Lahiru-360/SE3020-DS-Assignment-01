@@ -11,6 +11,7 @@ import { connectRabbitMQ } from './config/rabbitmq.js';
 import appointmentRoutes from './routes/appointmentRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { startSessionConsumer } from './events/sessionConsumer.js';
+import { startPaymentConsumer } from './events/paymentConsumer.js';
 
 connectDB();
 
@@ -19,7 +20,8 @@ connectDB();
 // starts immediately and RabbitMQ connects/retries in the background.
 connectRabbitMQ()
   .then(startSessionConsumer)
-  .catch((err) => console.error('[RabbitMQ] Failed to start session consumer:', err.message));
+  .then(startPaymentConsumer)
+  .catch((err) => console.error('[RabbitMQ] Failed to start consumers:', err.message));
 
 const app = express();
 
