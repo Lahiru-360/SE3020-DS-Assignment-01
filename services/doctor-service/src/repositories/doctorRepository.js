@@ -26,11 +26,11 @@ export const searchDoctors = ({ specialization, name } = {}) => {
   const filter = { isApproved: true };
 
   if (specialization) {
-    filter.specialization = { $regex: specialization, $options: 'i' };
+    filter.specialization = { $regex: specialization, $options: "i" };
   }
 
   if (name) {
-    const nameRegex = { $regex: name, $options: 'i' };
+    const nameRegex = { $regex: name, $options: "i" };
     filter.$or = [{ firstName: nameRegex }, { lastName: nameRegex }];
   }
 

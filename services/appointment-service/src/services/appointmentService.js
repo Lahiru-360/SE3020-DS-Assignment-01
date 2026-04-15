@@ -71,8 +71,50 @@ export const bookAppointmentService = async ({
   const bookings = await findActiveBookingsForDoctorOnDate(doctorId, dateStr);
   const bookedSet = new Set(bookings.map((b) => b.timeSlot));
 
-  // 7. Queue: pick the first slot not yet booked
-  const assignedSlot = allSlots.find((s) => !bookedSet.has(s));
+  // 7. Queue: pick the first slot not yet booked AND not already started (same-day guard)
+  //
+  // When the appointment is for TODAY (in the configured timezone), we skip any
+  // slot whose 20-min window has already begun — slotStart <= localNow.
+  // Example: booking at 10:21 LKT → skip 10:20, assign 10:40.
+  //
+  // TIMEZONE env var controls which timezone "today" and "now" are evaluated
+  // in. Defaults to Asia/Colombo (Sri Lanka, UTC+5:30). Change it in .env if
+  // the server is relocated.
+  const tz = process.env.TIMEZONE || 'Asia/Colombo';
+
+  // Get the current local date string "YYYY-MM-DD" in the configured timezone
+  const localNowParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year:     'numeric',
+    month:    '2-digit',
+    day:      '2-digit',
+  }).formatToParts(new Date());
+  const todayStr = localNowParts.map((p) => p.value).join(''); // "YYYY-MM-DD"
+  const isToday  = dateStr === todayStr;
+
+  // Get current local time as total minutes (HH * 60 + mm) in the same timezone
+  let nowMinutes = 0;
+  if (isToday) {
+    const timeParts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz,
+      hour:     '2-digit',
+      minute:   '2-digit',
+      hour12:   false,
+    }).formatToParts(new Date());
+    const localH = Number(timeParts.find((p) => p.type === 'hour').value);
+    const localM = Number(timeParts.find((p) => p.type === 'minute').value);
+    nowMinutes = localH * 60 + localM;
+  }
+
+  const assignedSlot = allSlots.find((s) => {
+    if (bookedSet.has(s)) return false;                        // already booked
+    if (isToday) {
+      const [h, m] = s.split(':').map(Number);
+      const slotStart = h * 60 + m;
+      if (slotStart <= nowMinutes) return false;               // slot already started
+    }
+    return true;
+  });
   if (!assignedSlot) {
     throw createHttpError(
       `No available slots for the ${phase} session on this date`,
@@ -101,7 +143,9 @@ export const bookAppointmentService = async ({
   });
 
   // 10. Fire-and-forget notifications to both parties
-  notifyBoth('appointment_booked', appointment).catch(() => {});
+  notifyBoth('appointment_booked', appointment).catch((err) =>
+    console.warn('[AppointmentService] notifyBoth error (booked):', err.message)
+  );
 
   return appointment;
 };
@@ -128,7 +172,9 @@ export const cancelAppointmentService = async (appointmentId, userId, role) => {
 
   const updated = await updateAppointmentById(appointmentId, { status: 'cancelled' });
 
-  notifyBoth('appointment_cancelled', updated).catch(() => {});
+  notifyBoth('appointment_cancelled', updated).catch((err) =>
+    console.warn('[AppointmentService] notifyBoth error (cancelled):', err.message)
+  );
 
   return updated;
 };
@@ -154,7 +200,9 @@ export const updateAppointmentStatusService = async (appointmentId, doctorId, ne
     completed:  'appointment_completed',
     cancelled:  'appointment_cancelled',
   };
-  notifyBoth(notifTypeMap[newStatus], updated).catch(() => {});
+  notifyBoth(notifTypeMap[newStatus], updated).catch((err) =>
+    console.warn('[AppointmentService] notifyBoth error (status update):', err.message)
+  );
 
   return updated;
 };
@@ -207,8 +255,8 @@ async function notifyBoth(type, appt) {
 
   const patientEmail = patient?.email ?? '';
   const patientName  = patient ? `${patient.firstName} ${patient.lastName}` : 'Patient';
-  const patientPhone = patient?.phone ?? null;
-  const doctorEmail  = doctor?.email  ?? '';
+  const patientPhone = patient?.phone   || null;   // null if absent — triggers email-only
+  const doctorEmail  = doctor?.email   ?? '';
   const doctorName   = doctor  ? `${doctor.firstName} ${doctor.lastName}`   : 'Doctor';
   const specialty    = doctor?.specialization ?? '';
 
@@ -222,17 +270,20 @@ async function notifyBoth(type, appt) {
     status:   appt.status,
   };
 
+  // Doctor phone is not fetched — always email-only for the doctor.
   const recipients = [
-    { email: patientEmail, name: patientName, phone: patientPhone },
-    { email: doctorEmail,  name: `Dr. ${doctorName}` },
+    { email: patientEmail, name: patientName,       phone: patientPhone },
+    { email: doctorEmail,  name: `Dr. ${doctorName}`, phone: null },
   ];
 
   for (const recipient of recipients) {
+    // Skip entirely if we have no address to deliver to
     if (!recipient.email) continue;
     // Publish one message per recipient to RabbitMQ.
     // The notification-service consumer picks these up and handles email + SMS.
     publishAppointmentEvent(type, {
       type,
+      channel: recipient.phone ? 'both' : 'email',
       recipientEmail: recipient.email,
       recipientName:  recipient.name,
       recipientPhone: recipient.phone ?? null,
