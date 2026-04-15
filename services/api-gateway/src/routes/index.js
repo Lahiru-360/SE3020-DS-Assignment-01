@@ -19,6 +19,7 @@ import { availabilityRouter } from "./availability.routes.js";
 import { appointmentRouter } from "./appointment.routes.js";
 import { telemedicineRouter } from "./telemedicine.routes.js";
 import { paymentRouter } from "./payment.routes.js";
+import { aiRouter } from "./ai.routes.js";
 
 const router = Router();
 
@@ -29,6 +30,7 @@ router.use(availabilityRouter);
 router.use(appointmentRouter);
 router.use(telemedicineRouter);
 router.use(paymentRouter);
+router.use(aiRouter);
 
 export default router;
 
