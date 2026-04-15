@@ -8,6 +8,7 @@ import {
 } from '../repositories/telemedicineRepository.js';
 import { createHttpError } from '../utils/httpError.js';
 import { buildJoinUrl } from '../utils/jaasHelper.js';
+import { publishSessionEnded } from '../events/sessionPublisher.js';
 
 const SESSION_WINDOW_MS = 60 * 60 * 1000; // 1 hour in milliseconds
 const SL_OFFSET_MS = (5 * 60 + 30) * 60 * 1000; // Sri Lanka UTC+5:30 in milliseconds
@@ -128,17 +129,9 @@ export const endSessionService = async (appointmentId, userId, role) => {
 
   const updated = await updateSessionStatusByAppointmentId(appointmentId, 'ENDED');
 
-  // Auto-update appointment status to 'completed'
-  try {
-    await axios.patch(
-      `${process.env.APPOINTMENT_SERVICE_URL}/api/appointments/internal/${appointmentId}/status`,
-      { status: 'completed' },
-      { headers: internalHeaders() }
-    );
-  } catch {
-    // Non-fatal: session is ended even if appointment update fails
-    console.error(`Failed to mark appointment ${appointmentId} as completed`);
-  }
+  // Publish session.ended event — appointment-service consumes this and marks
+  // the appointment as "completed" without a direct HTTP call back here.
+  publishSessionEnded(appointmentId);
 
   return updated;
 };

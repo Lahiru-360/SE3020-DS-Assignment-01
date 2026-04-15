@@ -9,6 +9,7 @@ import {
   findActiveBookingForSlot,
 } from '../repositories/appointmentRepository.js';
 import { createHttpError } from '../utils/httpError.js';
+import { publishAppointmentEvent } from '../events/appointmentPublisher.js';
 
 // ─── Allowed status transitions ────────────────────────────────────────────
 const STATUS_TRANSITIONS = {
@@ -228,17 +229,16 @@ async function notifyBoth(type, appt) {
 
   for (const recipient of recipients) {
     if (!recipient.email) continue;
-    await axios.post(
-      `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/send`,
-      {
-        type,
-        recipientEmail: recipient.email,
-        recipientName:  recipient.name,
-        recipientPhone: recipient.phone,
-        metadata,
-      },
-      { headers: internalHeaders() }
-    );
+    // Publish one message per recipient to RabbitMQ.
+    // The notification-service consumer picks these up and handles email + SMS.
+    publishAppointmentEvent(type, {
+      type,
+      recipientEmail: recipient.email,
+      recipientName:  recipient.name,
+      recipientPhone: recipient.phone ?? null,
+      source:         'appointment-service',
+      metadata,
+    });
   }
 }
 

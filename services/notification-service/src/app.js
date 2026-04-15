@@ -7,10 +7,17 @@ import cors from 'cors';
 import morgan from 'morgan';
 
 import { connectDB } from './config/db.js';
+import { connectRabbitMQ } from './config/rabbitmq.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { startNotificationConsumer } from './events/notificationConsumer.js';
 
 connectDB();
+
+// Connect to RabbitMQ and start the appointment event consumer.
+connectRabbitMQ()
+  .then(startNotificationConsumer)
+  .catch((err) => console.error('[RabbitMQ] Failed to start notification consumer:', err.message));
 
 const app = express();
 

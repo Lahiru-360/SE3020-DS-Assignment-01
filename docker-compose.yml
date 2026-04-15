@@ -19,6 +19,22 @@
 # ─────────────────────────────────────────────────────────────────
 
 services:
+  # ── RabbitMQ ───────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: hc-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"   # AMQP protocol (used by services)
+      - "15672:15672" # Management UI — http://localhost:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-hcadmin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-hcpassword}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - hc-network
+
   # ── MongoDB ───────────────────────────────────────────────────
   mongo:
     image: mongo:7
@@ -122,11 +138,13 @@ services:
       PATIENT_SERVICE_URL: http://patient-service:5002
       NOTIFICATION_SERVICE_URL: http://notification-service:5004
       SLOT_DURATION_MINUTES: ${SLOT_DURATION_MINUTES:-20}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-hcadmin}:${RABBITMQ_PASS:-hcpassword}@rabbitmq:5672
     depends_on:
       - mongo
       - doctor-service
       - patient-service
       - notification-service
+      - rabbitmq
     volumes:
       - ./services/appointment-service:/app
       - /app/node_modules
@@ -155,8 +173,10 @@ services:
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-your_twilio_auth_token}
       TWILIO_MESSAGING_SERVICE_SID: ${TWILIO_MESSAGING_SERVICE_SID:-MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-hcadmin}:${RABBITMQ_PASS:-hcpassword}@rabbitmq:5672
     depends_on:
       - mongo
+      - rabbitmq
     volumes:
       - ./services/notification-service:/app
       - /app/node_modules
@@ -178,9 +198,11 @@ services:
       MONGO_URI: mongodb://mongo:27017/telemedicine-service
       INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
       APPOINTMENT_SERVICE_URL: http://appointment-service:5003
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-hcadmin}:${RABBITMQ_PASS:-hcpassword}@rabbitmq:5672
     depends_on:
       - mongo
       - appointment-service
+      - rabbitmq
     volumes:
       - ./services/telemedicine-service:/app
       - /app/node_modules
@@ -222,6 +244,8 @@ services:
 # ── Volumes ────────────────────────────────────────────────────
 volumes:
   mongo_data:
+    driver: local
+  rabbitmq_data:
     driver: local
 
 # ── Networks ───────────────────────────────────────────────────

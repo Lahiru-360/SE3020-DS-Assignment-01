@@ -7,10 +7,19 @@ import cors from 'cors';
 import morgan from 'morgan';
 
 import { connectDB } from './config/db.js';
+import { connectRabbitMQ } from './config/rabbitmq.js';
 import appointmentRoutes from './routes/appointmentRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { startSessionConsumer } from './events/sessionConsumer.js';
 
 connectDB();
+
+// Connect to RabbitMQ and start the session.ended consumer.
+// Uses the same fire-and-forget pattern as connectDB() — the HTTP server
+// starts immediately and RabbitMQ connects/retries in the background.
+connectRabbitMQ()
+  .then(startSessionConsumer)
+  .catch((err) => console.error('[RabbitMQ] Failed to start session consumer:', err.message));
 
 const app = express();
 
