@@ -1,19 +1,3 @@
-// ─────────────────────────────────────────────────────
-// Auth Service Routes
-//
-// Public routes (register/*, login, refresh, logout) are
-// forwarded without JWT verification — the client does not
-// have a token yet when hitting these endpoints.
-//
-// Admin routes (/api/auth/admin/*) require a valid JWT with
-// role=admin before being forwarded.
-//
-// NOTE: The guard middleware is registered separately from the
-// proxy. router.use('/api/auth/admin', guard) strips the prefix
-// inside the guard but RESTORES the full URL before the next
-// handler runs, so the proxy always receives the complete path.
-// ─────────────────────────────────────────────────────
-
 import { Router } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { config } from '../config/index.js';

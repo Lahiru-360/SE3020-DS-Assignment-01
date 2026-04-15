@@ -1,11 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Telemedicine Service Routes — API Gateway
-//
-// Routes and their role requirements:
-//   GET  /api/telemedicine/sessions/:appointmentId      → patient or doctor
-//   POST /api/telemedicine/sessions/:appointmentId/end  → doctor only
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { Router } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { config } from '../config/index.js';

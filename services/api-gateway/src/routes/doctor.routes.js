@@ -1,7 +1,3 @@
-// ─────────────────────────────────────────────────────
-// Doctor Service Routes — API Gateway
-// ─────────────────────────────────────────────────────
-
 import { Router } from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { config } from "../config/index.js";
@@ -9,8 +5,6 @@ import { verifyToken, requireRole } from "../middleware/authMiddleware.js";
 
 const router = Router();
 
-// Only authenticated doctors can access the API Gateway doctor endpoints directly.
-// (e.g. updating profile). Other endpoints are protected internally.
 router.use("/api/doctors", verifyToken, requireRole("doctor"));
 router.use("/api/prescriptions", verifyToken);
 

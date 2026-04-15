@@ -1,17 +1,3 @@
-// ─────────────────────────────────────────────────────
-// AUTH MIDDLEWARE — API Gateway only.
-// This is the SINGLE place in the entire system where
-// JWT tokens are verified.
-// After verification, user info is injected into the
-// forwarded request headers so downstream services can
-// identify the caller without doing any JWT work.
-//
-// Downstream services receive:
-//   x-user-id    → the authenticated user's MongoDB _id
-//   x-user-role  → 'patient' | 'doctor' | 'admin'
-//   x-user-email → the authenticated user's email
-// ─────────────────────────────────────────────────────
-
 import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
 

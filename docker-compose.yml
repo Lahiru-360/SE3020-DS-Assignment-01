@@ -1,6 +1,12 @@
 # ─────────────────────────────────────────────────────────────────
 # HC Platform — Docker Compose
 #
+# Environment strategy:
+#   Each service has its own .env file (gitignored) with ALL its
+#   variables. Docker Compose loads them via env_file — no
+#   environment: overrides. Copy .env.example → .env and fill in
+#   real values before first run.
+#
 # Currently registered services:
 #   api-gateway           → port 5000  (public entry point)
 #   auth-service          → port 5007  (internal only)
@@ -8,14 +14,9 @@
 #   doctor-service        → port 5001  (internal only)
 #   appointment-service   → port 5003  (internal only)
 #   notification-service  → port 5004  (internal only)
+#   telemedicine-service  → port 5005  (internal only)
+#   rabbitmq              → port 5672  (AMQP) / 15672 (management UI)
 #   mongo                 → port 27017 (internal only)
-#
-# Add a new service block here each time a new microservice is built.
-# Pattern to follow:
-#   1. Add a service block below (copy the auth-service block as a template)
-#   2. Add its env vars
-#   3. Add it to the `depends_on` list of api-gateway
-#   4. Register its URL in api-gateway's environment block
 # ─────────────────────────────────────────────────────────────────
 
 services:
@@ -28,8 +29,8 @@ services:
       - "5672:5672"   # AMQP protocol (used by services)
       - "15672:15672" # Management UI — http://localhost:15672
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-hcadmin}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-hcpassword}
+      RABBITMQ_DEFAULT_USER: hcadmin
+      RABBITMQ_DEFAULT_PASS: hcpassword
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
@@ -55,16 +56,7 @@ services:
     container_name: hc-auth-service
     restart: unless-stopped
     env_file:
-      - ./services/auth-service/.env.example # replace with .env in production
-    environment:
-      PORT: 5007
-      MONGO_URI: mongodb://mongo:27017/auth-service
-      JWT_SECRET: ${JWT_SECRET:-your_super_secret_jwt_key_change_in_production}
-      JWT_EXPIRES_IN: 7d
-      JWT_REFRESH_EXPIRES_IN: 30d
-      PATIENT_SERVICE_URL: http://patient-service:5002
-      DOCTOR_SERVICE_URL: http://doctor-service:5001
-      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
+      - ./services/auth-service/.env
     depends_on:
       - mongo
       - patient-service
@@ -74,7 +66,6 @@ services:
       - /app/node_modules
     networks:
       - hc-network
-    # NOT exposed to the host — all traffic must go through the gateway
 
   # ── Patient Service ───────────────────────────────────────────
   patient-service:
@@ -84,12 +75,7 @@ services:
     container_name: hc-patient-service
     restart: unless-stopped
     env_file:
-      - ./services/patient-service/.env.example # replace with .env in production
-    environment:
-      PORT: 5002
-      MONGO_URI: mongodb://mongo:27017/patient-service
-      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
-      # The env_file will supply SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
+      - ./services/patient-service/.env
     depends_on:
       - mongo
     volumes:
@@ -97,7 +83,6 @@ services:
       - /app/node_modules
     networks:
       - hc-network
-    # NOT exposed to the host — called internally by auth-service only
 
   # ── Doctor Service ────────────────────────────────────────────
   doctor-service:
@@ -107,13 +92,7 @@ services:
     container_name: hc-doctor-service
     restart: unless-stopped
     env_file:
-      - ./services/doctor-service/.env.example # replace with .env in production
-    environment:
-      PORT: 5001
-      MONGO_URI: mongodb://mongo:27017/doctor-service
-      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
-      APPOINTMENT_SERVICE_URL: http://appointment-service:5003
-      PATIENT_SERVICE_URL: http://patient-service:5002
+      - ./services/doctor-service/.env
     depends_on:
       - mongo
     volumes:
@@ -121,7 +100,6 @@ services:
       - /app/node_modules
     networks:
       - hc-network
-    # NOT exposed to the host — called internally by auth-service only
 
   # ── Appointment Service ───────────────────────────────────────
   appointment-service:
@@ -131,16 +109,7 @@ services:
     container_name: hc-appointment-service
     restart: unless-stopped
     env_file:
-      - ./services/appointment-service/.env.example # replace with .env in production
-    environment:
-      PORT: 5003
-      MONGO_URI: mongodb://mongo:27017/appointment-service
-      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
-      DOCTOR_SERVICE_URL: http://doctor-service:5001
-      PATIENT_SERVICE_URL: http://patient-service:5002
-      NOTIFICATION_SERVICE_URL: http://notification-service:5004
-      SLOT_DURATION_MINUTES: ${SLOT_DURATION_MINUTES:-20}
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-hcadmin}:${RABBITMQ_PASS:-hcpassword}@rabbitmq:5672
+      - ./services/appointment-service/.env
     depends_on:
       - mongo
       - doctor-service
@@ -152,7 +121,6 @@ services:
       - /app/node_modules
     networks:
       - hc-network
-    # NOT exposed to the host — all traffic must go through the gateway
 
   # ── Notification Service ──────────────────────────────────────
   notification-service:
@@ -162,20 +130,7 @@ services:
     container_name: hc-notification-service
     restart: unless-stopped
     env_file:
-      - ./services/notification-service/.env.example # replace with .env in production
-    environment:
-      PORT: 5004
-      MONGO_URI: mongodb://mongo:27017/notification-service
-      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
-      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
-      EMAIL_PORT: ${EMAIL_PORT:-587}
-      EMAIL_USER: ${EMAIL_USER:-your_email@gmail.com}
-      EMAIL_PASS: ${EMAIL_PASS:-your_app_password}
-      EMAIL_FROM: ${EMAIL_FROM:-HC Platform <no-reply@hcplatform.com>}
-      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
-      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-your_twilio_auth_token}
-      TWILIO_MESSAGING_SERVICE_SID: ${TWILIO_MESSAGING_SERVICE_SID:-MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-hcadmin}:${RABBITMQ_PASS:-hcpassword}@rabbitmq:5672
+      - ./services/notification-service/.env
     depends_on:
       - mongo
       - rabbitmq
@@ -184,9 +139,8 @@ services:
       - /app/node_modules
     networks:
       - hc-network
-    # NOT exposed to the host — triggered internally by appointment-service
 
-  # ── Telemedicine Service ──────────────────────────────────────────────────
+  # ── Telemedicine Service ──────────────────────────────────────
   telemedicine-service:
     build:
       context: ./services/telemedicine-service
@@ -194,13 +148,7 @@ services:
     container_name: hc-telemedicine-service
     restart: unless-stopped
     env_file:
-      - ./services/telemedicine-service/.env.example
-    environment:
-      PORT: 5005
-      MONGO_URI: mongodb://mongo:27017/telemedicine-service
-      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
-      APPOINTMENT_SERVICE_URL: http://appointment-service:5003
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-hcadmin}:${RABBITMQ_PASS:-hcpassword}@rabbitmq:5672
+      - ./services/telemedicine-service/.env
     depends_on:
       - mongo
       - appointment-service
@@ -210,7 +158,6 @@ services:
       - /app/node_modules
     networks:
       - hc-network
-    # NOT exposed to the host — all traffic must go through the gateway
 
   # ── API Gateway ───────────────────────────────────────────────
   api-gateway:
@@ -221,15 +168,8 @@ services:
     restart: unless-stopped
     ports:
       - "5000:5000" # single public-facing port
-    environment:
-      PORT: 5000
-      JWT_SECRET: ${JWT_SECRET:-your_super_secret_jwt_key_change_in_production}
-      AUTH_SERVICE_URL: http://auth-service:5007
-      PATIENT_SERVICE_URL: http://patient-service:5002
-      DOCTOR_SERVICE_URL: http://doctor-service:5001
-      APPOINTMENT_SERVICE_URL: http://appointment-service:5003
-      NOTIFICATION_SERVICE_URL: http://notification-service:5004
-      TELEMEDICINE_SERVICE_URL: http://telemedicine-service:5005
+    env_file:
+      - ./services/api-gateway/.env
     depends_on:
       - auth-service
       - patient-service

@@ -1,8 +1,5 @@
 import mongoose from 'mongoose';
 
-// Stores the patient profile created by auth-service during registration.
-// userId is the _id from auth-service's users collection — the canonical link
-// between the identity record and the profile record.
 const PatientSchema = new mongoose.Schema(
   {
     userId: {
