@@ -4,9 +4,11 @@ export const analyzeValidators = [
   body('symptoms')
     .isString().withMessage('Symptoms must be a string')
     .trim()
-    .notEmpty().withMessage('Symptoms are required')
+    .notEmpty().withMessage('Symptoms are required and cannot be empty or just whitespace')
     .isLength({ min: 10, max: 2000 })
-    .withMessage('Symptoms must be between 10 and 2000 characters'),
+    .withMessage('Symptoms must be between 10 and 2000 characters')
+    .matches(/^[a-zA-Z0-9\s.,!?;:'"()-]+$/)
+    .withMessage('Symptoms contain invalid characters. Only letters, numbers, and basic punctuation are allowed.'),
   
   // Middleware to handle the validation result
   (req, res, next) => {

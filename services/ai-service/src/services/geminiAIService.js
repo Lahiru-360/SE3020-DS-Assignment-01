@@ -3,7 +3,7 @@ import { config } from '../config/index.js';
 
 export const analyzeSymptoms = async (symptoms) => {
   // Use user-provided model first, then fallback to others
-  const modelsToTry = [config.GEMINI_MODEL, 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+  const modelsToTry = [config.GEMINI_MODEL, 'gemini-2.0-flash', 'gemini-2.0-pro-exp-02-05'];
   let lastError = null;
 
   console.log('Using API Key (first 5 chars):', config.GEMINI_API_KEY ? config.GEMINI_API_KEY.substring(0, 5) : 'MISSING');
