@@ -9,6 +9,20 @@ import {
   updatePrescriptionById,
 } from "../repositories/prescriptionRepository.js";
 import { createHttpError } from "../utils/httpError.js";
+import path from "path";
+import { fileURLToPath } from "url";
+import DoctorModel from "../models/doctorModel.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const COLORS = {
+  primary: "#1a6fa8",
+  accent: "#27ae7a",
+  textPrimary: "#1e2b38",
+  textSecondary: "#4f6578",
+  border: "#d6e8f2",
+};
 
 const APPOINTMENT_SERVICE_URL =
   process.env.APPOINTMENT_SERVICE_URL || "http://appointment-service:5003";
@@ -172,52 +186,152 @@ export const generatePrescriptionPdfForUserService = async (
 ) => {
   const prescription = await getPrescriptionByIdForUserService(id, requesterId);
 
+  const doctor = await DoctorModel.findById(prescription.doctorId);
+
+  const patientRes = await axios.get(
+    `${process.env.PATIENT_SERVICE_URL}/api/patients/internal/${prescription.patientId}`,
+    {
+      headers: {
+        "x-internal-secret": process.env.INTERNAL_SECRET,
+      },
+    },
+  );
+  console.log("Patient API response:", patientRes.data);
+
+  const patient = patientRes.data?.data;
+
+  if (!doctor) throw new Error("Doctor not found");
+  if (!patient) throw new Error("Patient not found");
+
+  const doctorName = `${doctor.firstName} ${doctor.lastName}`.trim();
+  const patientName = `${patient.firstName} ${patient.lastName}`.trim();
+
   const doc = new PDFDocument({ size: "A4", margin: 50 });
   const chunks = [];
+
+  const logoPath = path.join(__dirname, "../assets/logo.png");
 
   return await new Promise((resolve, reject) => {
     doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () =>
       resolve({ buffer: Buffer.concat(chunks), prescription }),
     );
-    doc.on("error", (error) => reject(error));
+    doc.on("error", reject);
 
-    doc.fontSize(18).text("Prescription", { align: "center" });
+    // ───────────────── HEADER ─────────────────
+    doc.image(logoPath, 50, 40, { width: 50 });
+
+    doc
+      .fontSize(20)
+      .fillColor(COLORS.primary)
+      .text("SafeMother Health Platform", 110, 45);
+
+    doc
+      .fontSize(10)
+      .fillColor(COLORS.textSecondary)
+      .text("Digital Prescription System", 110, 70);
+
+    doc.moveDown(2);
+
+    // Divider
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke(COLORS.border);
+
     doc.moveDown();
 
-    doc.fontSize(12).text(`Prescription ID: ${prescription._id}`);
-    doc.text(`Doctor ID: ${prescription.doctorId}`);
-    doc.text(`Patient ID: ${prescription.patientId}`);
-    doc.text(`Appointment ID: ${prescription.appointmentId}`);
-    doc.text(`Issued Date: ${new Date(prescription.issuedDate).toISOString()}`);
-    doc.text(`Version: ${prescription.version}`);
+    // ───────────────── DETAILS ─────────────────
+    doc.fontSize(12).fillColor(COLORS.textPrimary);
+
+    doc.text(`Prescription ID: ${prescription._id}`);
     doc.text(
-      `Last Updated: ${
-        prescription.lastUpdated
-          ? new Date(prescription.lastUpdated).toISOString()
-          : "N/A"
-      }`,
+      `Issued Date: ${new Date(prescription.issuedDate).toDateString()}`,
     );
+    doc.text(`Version: ${prescription.version}`);
 
     doc.moveDown();
-    doc.fontSize(13).text("Diagnosis", { underline: true });
-    doc.fontSize(12).text(prescription.diagnosis);
+
+    doc.font("Helvetica-Bold").text("Doctor:");
+    doc.font("Helvetica").text(`Dr. ${doctorName || "Unknown"}`);
+
+    doc.moveDown(0.5);
+
+    doc.font("Helvetica-Bold").text("Patient:");
+    doc.font("Helvetica").text(`${patientName || "Unknown"}`);
 
     doc.moveDown();
-    doc.fontSize(13).text("Medications", { underline: true });
-    prescription.medications.forEach((medication, index) => {
-      doc
-        .fontSize(12)
-        .text(
-          `${index + 1}. ${medication.name} | Dosage: ${medication.dosage} | Frequency: ${medication.frequency} | Duration: ${medication.duration}`,
-        );
+
+    // ───────────────── DIAGNOSIS ─────────────────
+    doc
+      .fontSize(14)
+      .fillColor(COLORS.primary)
+      .text("Diagnosis", { underline: true });
+
+    doc.fontSize(12).fillColor(COLORS.textPrimary).text(prescription.diagnosis);
+
+    doc.moveDown();
+
+    // ───────────────── MEDICATION TABLE ─────────────────
+    doc
+      .fontSize(14)
+      .fillColor(COLORS.primary)
+      .text("Medications", { underline: true });
+
+    doc.moveDown(0.5);
+
+    // Table Header
+    doc.font("Helvetica-Bold").fontSize(11);
+
+    const startY = doc.y;
+
+    doc.text("Name", 50, startY);
+    doc.text("Dosage", 150, startY);
+    doc.text("Frequency", 250, startY);
+    doc.text("Duration", 380, startY);
+
+    doc.moveDown(0.5);
+
+    // Line
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke(COLORS.border);
+
+    doc.moveDown(0.5);
+
+    // Table Rows
+    doc.font("Helvetica").fontSize(11);
+
+    prescription.medications.forEach((med) => {
+      const y = doc.y;
+
+      doc.text(med.name, 50, y);
+      doc.text(med.dosage, 150, y);
+      doc.text(med.frequency, 250, y);
+      doc.text(med.duration, 380, y);
+
+      doc.moveDown();
     });
 
+    doc.moveDown();
+
+    // ───────────────── NOTES ─────────────────
     if (prescription.notes) {
+      doc
+        .fontSize(14)
+        .fillColor(COLORS.primary)
+        .text("Notes", { underline: true });
+
+      doc.fontSize(12).fillColor(COLORS.textPrimary).text(prescription.notes);
+
       doc.moveDown();
-      doc.fontSize(13).text("Notes", { underline: true });
-      doc.fontSize(12).text(prescription.notes);
     }
+
+    // ───────────────── FOOTER ─────────────────
+    doc.moveDown(2);
+
+    doc
+      .fontSize(10)
+      .fillColor(COLORS.textSecondary)
+      .text(
+        "This is a digitally generated prescription. No signature required.",
+        { align: "center" },
+      );
 
     doc.end();
   });
