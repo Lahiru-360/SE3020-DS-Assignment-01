@@ -177,6 +177,9 @@ export const rejectDoctorService = async (userId) => {
   if (!user || user.role !== "doctor")
     throw createHttpError("Doctor user not found", 404);
 
+  if (user.isActive)
+    throw createHttpError("Cannot reject an already-approved doctor", 409);
+
   try {
     await axios.delete(
       `${process.env.DOCTOR_SERVICE_URL}/api/doctors/internal/${userId}`,
