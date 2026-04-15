@@ -73,7 +73,8 @@ services:
       PORT: 5002
       MONGO_URI: mongodb://mongo:27017/patient-service
       INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
-      # The env_file will supply SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
     depends_on:
       - mongo
     volumes:
@@ -123,6 +124,7 @@ services:
       DOCTOR_SERVICE_URL: http://doctor-service:5001
       PATIENT_SERVICE_URL: http://patient-service:5002
       NOTIFICATION_SERVICE_URL: http://notification-service:5004
+      PAYMENT_SERVICE_URL: http://payment-service:5006
       SLOT_DURATION_MINUTES: ${SLOT_DURATION_MINUTES:-20}
     depends_on:
       - mongo
@@ -190,6 +192,32 @@ services:
       - hc-network
     # NOT exposed to the host — all traffic must go through the gateway
 
+  # ── Payment Service ───────────────────────────────────────────────────────
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: hc-payment-service
+    restart: unless-stopped
+    env_file:
+      - ./services/payment-service/.env.example  # replace with .env in production
+    environment:
+      PORT: 5006
+      MONGO_URI: mongodb://mongo:27017/payment-service
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-change_this_internal_secret}
+      APPOINTMENT_SERVICE_URL: http://appointment-service:5003
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+    depends_on:
+      - mongo
+      - appointment-service
+    volumes:
+      - ./services/payment-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+      
+      
   # ── AI Suggestion Service ──────────────────────────────────────────────
   ai-service:
     build:
@@ -232,6 +260,7 @@ services:
       APPOINTMENT_SERVICE_URL: http://appointment-service:5003
       NOTIFICATION_SERVICE_URL: http://notification-service:5004
       TELEMEDICINE_SERVICE_URL: http://telemedicine-service:5005
+      PAYMENT_SERVICE_URL: http://payment-service:5006
       AI_SERVICE_URL: http://ai-service:5008
     depends_on:
       - auth-service
@@ -240,12 +269,14 @@ services:
       - appointment-service
       - notification-service
       - telemedicine-service
+      - payment-service
       - ai-service
     volumes:
       - ./services/api-gateway:/app
       - /app/node_modules
     networks:
       - hc-network
+
 
 # ── Volumes ────────────────────────────────────────────────────
 volumes:

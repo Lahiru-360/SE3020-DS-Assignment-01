@@ -5,6 +5,7 @@ import {
   findAppointmentsByPatientId,
   findAppointmentsByDoctorId,
   updateAppointmentById,
+  deleteAppointmentById,
   findActiveBookingsForDoctorOnDate,
   findActiveBookingForSlot,
 } from '../repositories/appointmentRepository.js';
@@ -29,6 +30,8 @@ export const bookAppointmentService = async ({
   phase,
   notes,
   type,
+  consultationFee,
+  currency,
 }) => {
   // 1. Validate doctor exists and is approved (internal call to doctor-service)
   let doctor;
@@ -134,11 +137,13 @@ export const bookAppointmentService = async ({
   const appointment = await createAppointment({
     patientId,
     doctorId,
-    date:     new Date(`${dateStr}T00:00:00.000Z`),
-    timeSlot: assignedSlot,
-    notes:    notes || null,
-    status:   'pending',
-    type:     type || 'PHYSICAL',
+    date:            new Date(`${dateStr}T00:00:00.000Z`),
+    timeSlot:        assignedSlot,
+    notes:           notes || null,
+    status:          'pending',
+    type:            type || 'PHYSICAL',
+    consultationFee: consultationFee || doctor.consultationFee,
+    currency:        currency || doctor.currency || 'LKR',
   });
 
   // 10. Fire-and-forget notifications to both parties
@@ -157,16 +162,45 @@ export const getMyAppointmentsService = (patientId) =>
 export const getDoctorAppointmentsService = (doctorId) =>
   findAppointmentsByDoctorId(doctorId);
 
-// ─── Cancel appointment (patient or doctor) ─────────────────────────────────
+// ─── Cancel appointment (patient or doctor only; not admin) ───────────────────
 export const cancelAppointmentService = async (appointmentId, userId, role) => {
   const appt = await findAppointmentById(appointmentId);
   if (!appt) throw createHttpError('Appointment not found', 404);
+
+  if (role === 'admin') {
+    throw createHttpError('Admins are not permitted to cancel appointments', 403);
+  }
+  if (role !== 'patient' && role !== 'doctor') {
+    throw createHttpError('Forbidden', 403);
+  }
 
   if (role === 'patient' && appt.patientId !== userId) throw createHttpError('Forbidden', 403);
   if (role === 'doctor'  && appt.doctorId  !== userId) throw createHttpError('Forbidden', 403);
 
   if (!STATUS_TRANSITIONS[appt.status]) {
     throw createHttpError(`Cannot cancel a ${appt.status} appointment`, 400);
+  }
+
+  if (appt.paymentStatus === 'paid') {
+    const deleted = await deleteAppointmentById(appointmentId);
+    try {
+      await axios.post(
+        `${process.env.PAYMENT_SERVICE_URL}/api/payments/internal/refund/${appointmentId}`,
+        {},
+        { headers: internalHeaders() }
+      );
+    } catch (err) {
+      console.error('[AppointmentService] Refund failed', {
+        appointmentId,
+        paymentId: appt.paymentId,
+        error: err.message,
+      });
+      // do NOT throw — cancel still succeeds
+    }
+    notifyBoth('appointment_cancelled', appt).catch((err) =>
+      console.warn('[AppointmentService] notifyBoth error (cancelled):', err.message)
+    );
+    return deleted;
   }
 
   const updated = await updateAppointmentById(appointmentId, { status: 'cancelled' });
@@ -350,3 +384,17 @@ async function fetchAvailabilityForDate(doctorId, dateStr) {
 // ─── Get appointment by ID (for internal service-to-service calls) ──────────
 export const getAppointmentByIdService = (appointmentId) =>
   findAppointmentById(appointmentId);
+
+// ─── Hard-delete appointment (internal; e.g. payment-service after failed payment) ─
+export const deleteAppointmentInternalService = async (appointmentId) => {
+  const deleted = await deleteAppointmentById(appointmentId);
+  if (!deleted) throw createHttpError('Appointment not found', 404);
+  return deleted;
+};
+
+// ─── Update appointment payment fields (called by payment-service webhook) ──
+// Updates paymentStatus ('unpaid' | 'paid' | 'failed' | 'refunded')
+// and optionally paymentId (the Transaction _id from payment-service).
+export const updatePaymentStatusService = (appointmentId, updates) =>
+  updateAppointmentById(appointmentId, updates);
+
