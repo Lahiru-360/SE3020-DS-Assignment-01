@@ -15,13 +15,13 @@ import { startPaymentConsumer } from './events/paymentConsumer.js';
 
 connectDB();
 
-// Connect to RabbitMQ and start the session.ended consumer.
-// Uses the same fire-and-forget pattern as connectDB() — the HTTP server
-// starts immediately and RabbitMQ connects/retries in the background.
-connectRabbitMQ()
-  .then(startSessionConsumer)
-  .then(startPaymentConsumer)
-  .catch((err) => console.error('[RabbitMQ] Failed to start consumers:', err.message));
+// Connect to RabbitMQ and start consumers.
+// connectRabbitMQ retries indefinitely — the callback runs each time a fresh
+// connection is established, including after mid-runtime reconnects.
+connectRabbitMQ(async () => {
+  await startSessionConsumer();
+  await startPaymentConsumer();
+});
 
 const app = express();
 

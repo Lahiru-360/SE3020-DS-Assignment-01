@@ -14,8 +14,8 @@ import { errorHandler } from './middleware/errorHandler.js';
 connectDB();
 
 // Connect to RabbitMQ so the session publisher has a channel ready.
-connectRabbitMQ()
-  .catch((err) => console.error('[RabbitMQ] Failed to connect:', err.message));
+// connectRabbitMQ retries indefinitely with no consumers to start here.
+connectRabbitMQ();
 
 const app = express();
 

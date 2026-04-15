@@ -15,9 +15,11 @@ import { startNotificationConsumer } from './events/notificationConsumer.js';
 connectDB();
 
 // Connect to RabbitMQ and start the appointment event consumer.
-connectRabbitMQ()
-  .then(startNotificationConsumer)
-  .catch((err) => console.error('[RabbitMQ] Failed to start notification consumer:', err.message));
+// connectRabbitMQ retries indefinitely — the callback runs each time a fresh
+// connection is established, including after mid-runtime reconnects.
+connectRabbitMQ(async () => {
+  await startNotificationConsumer();
+});
 
 const app = express();
 

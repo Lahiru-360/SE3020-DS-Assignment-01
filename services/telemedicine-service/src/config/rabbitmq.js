@@ -1,41 +1,53 @@
 import amqplib from 'amqplib';
 
-
 export const EXCHANGE = 'hc.platform.events';
 
 let channel = null;
 
-// ─── Connect with startup retry ─────────────────────────────────────────────
-export const connectRabbitMQ = async (maxRetries = 10, retryIntervalMs = 3000) => {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+// Reconnect loop
+const reconnect = async (onConnected) => {
+  let delay = 3000;
+  let attempt = 0;
+  while (true) {
+    attempt++;
     try {
       const connection = await amqplib.connect(process.env.RABBITMQ_URL);
-
       channel = await connection.createChannel();
-
       await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
+
+      channel.on('error', (err) =>
+        console.error('[RabbitMQ][telemedicine-service] Channel error:', err.message)
+      );
+      channel.on('close', () => {
+        console.warn('[RabbitMQ][telemedicine-service] Channel closed — reconnecting...');
+        channel = null;
+        reconnect(onConnected);
+      });
 
       connection.on('error', (err) =>
         console.error('[RabbitMQ][telemedicine-service] Connection error:', err.message)
       );
       connection.on('close', () => {
-        console.warn('[RabbitMQ][telemedicine-service] Connection closed');
+        console.warn('[RabbitMQ][telemedicine-service] Connection lost — reconnecting...');
         channel = null;
+        reconnect(onConnected);
       });
 
       console.log('[RabbitMQ][telemedicine-service] Connected to', process.env.RABBITMQ_URL);
-      return channel;
+      delay = 3000;
+      if (onConnected) await onConnected();
+      return;
     } catch (err) {
       console.warn(
-        `[RabbitMQ][telemedicine-service] Attempt ${attempt}/${maxRetries} failed: ${err.message}.` +
-          (attempt < maxRetries ? ` Retrying in ${retryIntervalMs / 1000}s...` : ' Giving up.')
+        `[RabbitMQ][telemedicine-service] Attempt ${attempt} failed: ${err.message}. Retrying in ${delay / 1000}s...`
       );
-      if (attempt < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, retryIntervalMs));
-      }
+      const jitter = Math.random() * 1000;
+      await new Promise((resolve) => setTimeout(resolve, delay + jitter));
+      delay = Math.min(delay * 2, 30000);
     }
   }
-  throw new Error('[RabbitMQ][telemedicine-service] Could not connect after all retries');
 };
+
+export const connectRabbitMQ = (onConnected) => reconnect(onConnected);
 
 export const getChannel = () => channel;

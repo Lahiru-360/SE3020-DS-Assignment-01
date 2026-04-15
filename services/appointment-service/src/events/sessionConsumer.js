@@ -1,15 +1,11 @@
 import { getChannel, EXCHANGE } from '../config/rabbitmq.js';
 import { updateAppointmentById } from '../repositories/appointmentRepository.js';
 
-// ─── Queue configuration ─────────────────────────────────────────────────────
+// Queue config
 const QUEUE       = 'appointment.session.events';
 const ROUTING_KEY = 'telemedicine.session.ended';
 
-// ─── Start the session-ended consumer ────────────────────────────────────────
-// Called once at service startup (after connectRabbitMQ resolves).
-// Listens for telemedicine.session.ended events published by telemedicine-service
-// and marks the corresponding appointment as "completed".
-// This replaces the direct HTTP PATCH call that telemedicine-service used to make.
+// Session-ended consumer
 export const startSessionConsumer = async () => {
   const channel = getChannel();
 
