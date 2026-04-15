@@ -11,7 +11,7 @@ import {
 import { createHttpError } from "../utils/httpError.js";
 import path from "path";
 import { fileURLToPath } from "url";
-import DoctorModel from "../models/doctorModel.js";
+import { findDoctorByUserId } from "../repositories/doctorRepository.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -186,7 +186,7 @@ export const generatePrescriptionPdfForUserService = async (
 ) => {
   const prescription = await getPrescriptionByIdForUserService(id, requesterId);
 
-  const doctor = await DoctorModel.findById(prescription.doctorId);
+  const doctor = await findDoctorByUserId(prescription.doctorId);
 
   const patientRes = await axios.get(
     `${process.env.PATIENT_SERVICE_URL}/api/patients/internal/${prescription.patientId}`,
@@ -196,11 +196,10 @@ export const generatePrescriptionPdfForUserService = async (
       },
     },
   );
-  console.log("Patient API response:", patientRes.data);
 
   const patient = patientRes.data?.data;
 
-  if (!doctor) throw new Error("Doctor not found");
+  if (!doctor) throw createHttpError("Doctor not found", 404);
   if (!patient) throw new Error("Patient not found");
 
   const doctorName = `${doctor.firstName} ${doctor.lastName}`.trim();
@@ -218,7 +217,7 @@ export const generatePrescriptionPdfForUserService = async (
     );
     doc.on("error", reject);
 
-    // ───────────────── HEADER ─────────────────
+    // ───────── HEADER ─────────
     doc.image(logoPath, 50, 40, { width: 50 });
 
     doc
@@ -233,12 +232,11 @@ export const generatePrescriptionPdfForUserService = async (
 
     doc.moveDown(2);
 
-    // Divider
     doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke(COLORS.border);
 
     doc.moveDown();
 
-    // ───────────────── DETAILS ─────────────────
+    // ───────── DETAILS ─────────
     doc.fontSize(12).fillColor(COLORS.textPrimary);
 
     doc.text(`Prescription ID: ${prescription._id}`);
@@ -259,7 +257,7 @@ export const generatePrescriptionPdfForUserService = async (
 
     doc.moveDown();
 
-    // ───────────────── DIAGNOSIS ─────────────────
+    // ───────── DIAGNOSIS ─────────
     doc
       .fontSize(14)
       .fillColor(COLORS.primary)
@@ -269,7 +267,14 @@ export const generatePrescriptionPdfForUserService = async (
 
     doc.moveDown();
 
-    // ───────────────── MEDICATION TABLE ─────────────────
+    // ───────── TABLE (FIXED ALIGNMENT) ─────────
+    const colX = {
+      name: 50,
+      dosage: 180,
+      frequency: 300,
+      duration: 430,
+    };
+
     doc
       .fontSize(14)
       .fillColor(COLORS.primary)
@@ -277,60 +282,69 @@ export const generatePrescriptionPdfForUserService = async (
 
     doc.moveDown(0.5);
 
-    // Table Header
     doc.font("Helvetica-Bold").fontSize(11);
 
-    const startY = doc.y;
+    let y = doc.y;
 
-    doc.text("Name", 50, startY);
-    doc.text("Dosage", 150, startY);
-    doc.text("Frequency", 250, startY);
-    doc.text("Duration", 380, startY);
+    doc.text("Name", colX.name, y);
+    doc.text("Dosage", colX.dosage, y);
+    doc.text("Frequency", colX.frequency, y);
+    doc.text("Duration", colX.duration, y);
 
     doc.moveDown(0.5);
 
-    // Line
     doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke(COLORS.border);
 
     doc.moveDown(0.5);
 
-    // Table Rows
     doc.font("Helvetica").fontSize(11);
 
     prescription.medications.forEach((med) => {
-      const y = doc.y;
+      y = doc.y;
 
-      doc.text(med.name, 50, y);
-      doc.text(med.dosage, 150, y);
-      doc.text(med.frequency, 250, y);
-      doc.text(med.duration, 380, y);
+      doc.text(med.name, colX.name, y);
+      doc.text(med.dosage, colX.dosage, y);
+      doc.text(med.frequency, colX.frequency, y);
+      doc.text(med.duration, colX.duration, y);
 
       doc.moveDown();
     });
 
     doc.moveDown();
 
-    // ───────────────── NOTES ─────────────────
+    // ───────── NOTES (FIXED POSITION RIGHT SIDE) ─────────
     if (prescription.notes) {
+      const notesX = 350; // 👉 move to right side
+      let notesY = doc.y;
+
       doc
         .fontSize(14)
         .fillColor(COLORS.primary)
-        .text("Notes", { underline: true });
+        .text("Notes", notesX, notesY, { underline: true });
 
-      doc.fontSize(12).fillColor(COLORS.textPrimary).text(prescription.notes);
+      notesY += 20;
+
+      doc
+        .fontSize(12)
+        .fillColor(COLORS.textPrimary)
+        .text(prescription.notes, notesX, notesY, {
+          width: 180, // wrap text nicely
+        });
 
       doc.moveDown();
     }
 
-    // ───────────────── FOOTER ─────────────────
-    doc.moveDown(2);
+    // ───────── FOOTER (FIXED POSITION) ─────────
+    const pageHeight = doc.page.height;
 
     doc
       .fontSize(10)
       .fillColor(COLORS.textSecondary)
       .text(
         "This is a digitally generated prescription. No signature required.",
-        { align: "center" },
+        50,
+        pageHeight - 50,
+        { align: "center", width: 500 },
       );
 
     doc.end();

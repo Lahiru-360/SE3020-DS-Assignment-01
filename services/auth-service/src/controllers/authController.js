@@ -8,6 +8,11 @@ import {
   getPendingDoctorsService,
   approveDoctorService,
   rejectDoctorService,
+  getAllUsersService,
+  getUserByIdService,
+  deactivateUserService,
+  activateUserService,
+  deleteUserService,
 } from '../services/authService.js';
 import { sendSuccess, sendError } from '../utils/responseHelper.js';
 
@@ -101,6 +106,76 @@ export const rejectDoctor = [
     try {
       await rejectDoctorService(req.params.userId);
       return sendSuccess(res, null, 'Doctor rejected and account removed', 200);
+    } catch (e) {
+      next(e);
+    }
+  },
+];
+
+// ─── Admin user-management controllers ────────────────────────────────────
+
+export const getAllUsers = [
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const data = await getAllUsersService(req.query);
+      return sendSuccess(res, data, 'Users retrieved', 200);
+    } catch (e) {
+      next(e);
+    }
+  },
+];
+
+export const getUserById = [
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
+      const user = await getUserByIdService(req.params.userId);
+      return sendSuccess(res, user, 'User retrieved', 200);
+    } catch (e) {
+      next(e);
+    }
+  },
+];
+
+export const deactivateUser = [
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
+      await deactivateUserService(req.params.userId, req.headers['x-user-id']);
+      return sendSuccess(res, null, 'User deactivated successfully', 200);
+    } catch (e) {
+      next(e);
+    }
+  },
+];
+
+export const activateUser = [
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
+      await activateUserService(req.params.userId);
+      return sendSuccess(res, null, 'User activated successfully', 200);
+    } catch (e) {
+      next(e);
+    }
+  },
+];
+
+export const deleteUser = [
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
+      await deleteUserService(req.params.userId, req.headers['x-user-id']);
+      return sendSuccess(res, null, 'User deleted successfully', 200);
     } catch (e) {
       next(e);
     }
