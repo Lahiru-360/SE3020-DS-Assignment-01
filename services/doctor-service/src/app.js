@@ -9,6 +9,7 @@ import morgan from "morgan";
 import { connectDB } from "./config/db.js";
 import doctorRoutes from "./routes/doctorRoutes.js";
 import availabilityRoutes from "./routes/availabilityRoutes.js";
+import prescriptionRoutes from "./routes/prescriptionRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 connectDB();
@@ -26,6 +27,7 @@ app.get("/health", (req, res) => {
 
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/availability", availabilityRoutes);
+app.use("/api/prescriptions", prescriptionRoutes);
 
 app.use(errorHandler);
 
