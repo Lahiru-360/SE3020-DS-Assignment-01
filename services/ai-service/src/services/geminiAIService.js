@@ -2,8 +2,14 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config/index.js';
 
 export const analyzeSymptoms = async (symptoms) => {
-  // Use user-provided model first, then fallback to others
-  const modelsToTry = [config.GEMINI_MODEL, 'gemini-2.0-flash', 'gemini-2.0-pro-exp-02-05'];
+  // Use user-provided model first, then stable fallbacks
+  const modelsToTry = [
+    config.GEMINI_MODEL,
+    'gemini-3-flash-preview',
+    'gemini-2.5-flash',
+    'gemini-flash-lite-latest',
+    'gemini-flash-latest'
+  ];
   let lastError = null;
 
   console.log('Using API Key (first 5 chars):', config.GEMINI_API_KEY ? config.GEMINI_API_KEY.substring(0, 5) : 'MISSING');
@@ -35,11 +41,11 @@ export const analyzeSymptoms = async (symptoms) => {
         General Physician, Cardiologist, Neurologist, Dermatologist, Orthopedic, Pediatrician, Gynecologist, Psychiatrist, ENT Specialist
 
         Guidelines:
-        1. If symptoms suggest a life-threatening emergency (e.g., heart attack signs, stroke signs, severe bleeding, difficulty breathing), set "urgency" to "emergency" and "specialty" to "General Physician".
+        1. If symptoms suggest a life-threatening emergency (e.g., heart attack signs, stroke signs, severe bleeding, difficulty breathing), set "urgency" to "emergency".
         2. In emergency cases, set "warning" to "IMMEDIATE ACTION REQUIRED: Please proceed to the nearest Emergency Room or call emergency services (e.g., 911/199) immediately."
         3. If symptoms are urgent but not life-threatening, set "urgency" to "urgent" and "warning" to null.
         4. Otherwise, set "urgency" to "normal" and "warning" to null.
-        5. If the symptoms are unclear, default to "General Physician" with "urgency" as "normal".
+        5. Match the most appropriate specialty from the list. Only use "General Physician" for common cold/flu symptoms, general wellness, or when signs are too vague for a specific specialist.
         6. The "reason" should be a concise, professional explanation for the suggestion.
         7. For "warningSigns", "homeRemedies", and "medicationsToAvoid", provide relevant health suggestions based on the symptoms.
         8. The "disclaimer" must always be: "These are general suggestions only. Always follow your doctor's advice."
@@ -75,15 +81,15 @@ export const analyzeSymptoms = async (symptoms) => {
   }
 
   console.error('All Gemini models failed. Last Error:', lastError);
-  // Fallback response
+  // Fallback response - more informative
   return {
     specialty: 'General Physician',
-    reason: 'Based on the input provided, we recommend seeing a general physician for an initial assessment.',
+    reason: 'The AI analysis is currently unavailable. We recommend consulting a general physician for an initial triage due to internal technical limitations.',
     urgency: 'normal',
-    warning: null,
+    warning: 'AI SERVICE UNAVAILABLE: Please seek professional medical advice if symptoms are concerning.',
     warningSigns: [],
-    homeRemedies: ["Rest and monitor symptoms"],
-    medicationsToAvoid: ["Avoid taking medication without consulting a doctor"],
+    homeRemedies: ["Monitor symptoms carefully"],
+    medicationsToAvoid: ["Avoid self-medication"],
     disclaimer: "These are general suggestions only. Always follow your doctor's advice."
   };
 };
