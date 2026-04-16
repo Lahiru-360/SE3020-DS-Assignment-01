@@ -1,0 +1,156 @@
+import { useState } from "react";
+import { useAuth } from "../../context/useAuth";
+import { updatePatientProfile } from "../../api/patientService";
+import FormInput from "../../components/ui/FormInput";
+import Alert from "../../components/ui/Alert";
+
+// ── Constants ──────────────────────────────────────────────────────────────
+
+const INITIAL_FORM = {
+  firstName: "",
+  lastName: "",
+  phone: "",
+};
+
+// ── Component ──────────────────────────────────────────────────────────────
+
+export default function PatientSettings() {
+  const { userEmail } = useAuth();
+
+  const [form, setForm] = useState(INITIAL_FORM);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const handleChange = (field) => (e) => {
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  // ── Validation ─────────────────────────────────────────────────────────
+
+  const validate = () => {
+    const errs = {};
+    const nameRe = /^[a-zA-Z\s'-]+$/;
+    const phoneRe = /^\+?[\d\s-]{7,15}$/;
+
+    if (form.firstName) {
+      if (!nameRe.test(form.firstName))
+        errs.firstName =
+          "First name may only contain letters, spaces, hyphens, or apostrophes.";
+      else if (form.firstName.length > 50)
+        errs.firstName = "First name must not exceed 50 characters.";
+    }
+    if (form.lastName) {
+      if (!nameRe.test(form.lastName))
+        errs.lastName =
+          "Last name may only contain letters, spaces, hyphens, or apostrophes.";
+      else if (form.lastName.length > 50)
+        errs.lastName = "Last name must not exceed 50 characters.";
+    }
+    if (form.phone && !phoneRe.test(form.phone)) {
+      errs.phone = "Enter a valid phone number (7–15 digits).";
+    }
+
+    return errs;
+  };
+
+  // ── Submit ─────────────────────────────────────────────────────────────
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
+      return;
+    }
+
+    // Build payload with only non-empty fields (backend requires at least one)
+    const payload = {};
+    if (form.firstName.trim()) payload.firstName = form.firstName.trim();
+    if (form.lastName.trim()) payload.lastName = form.lastName.trim();
+    if (form.phone.trim()) payload.phone = form.phone.trim();
+
+    if (Object.keys(payload).length === 0) {
+      setError("Please fill in at least one field to update.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updatePatientProfile(payload);
+      setSuccess("Profile updated successfully.");
+      setForm(INITIAL_FORM);
+    } catch (err) {
+      setError(err.response?.data?.message ?? "Failed to update profile.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────
+
+  return (
+    <div className="max-w-lg mx-auto space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-semibold text-text-primary">
+          Profile Settings
+        </h1>
+        <p className="text-sm text-text-muted mt-0.5">{userEmail}</p>
+      </div>
+
+      <div className="rounded-xl border border-border bg-bg-card p-6">
+        <p className="text-xs text-text-muted mb-5">
+          Fill in only the fields you want to update. All fields are optional.
+        </p>
+
+        {error && <Alert type="error">{error}</Alert>}
+        {success && <Alert type="success">{success}</Alert>}
+
+        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+          <FormInput
+            id="patient-firstName"
+            label="First Name"
+            value={form.firstName}
+            onChange={handleChange("firstName")}
+            placeholder="e.g. Samantha"
+            error={fieldErrors.firstName}
+          />
+          <FormInput
+            id="patient-lastName"
+            label="Last Name"
+            value={form.lastName}
+            onChange={handleChange("lastName")}
+            placeholder="e.g. Perera"
+            error={fieldErrors.lastName}
+          />
+          <FormInput
+            id="patient-phone"
+            label="Phone Number"
+            value={form.phone}
+            onChange={handleChange("phone")}
+            placeholder="e.g. +94771234567"
+            error={fieldErrors.phone}
+          />
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+          >
+            {saving ? "Saving…" : "Save Changes"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

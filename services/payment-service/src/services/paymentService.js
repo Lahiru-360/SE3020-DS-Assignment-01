@@ -11,34 +11,36 @@
 //   - Raw card data is NEVER stored — only PCI-safe metadata from the charge object
 // ─────────────────────────────────────────────────────────────────────────────
 
-import Stripe from 'stripe';
-import axios from 'axios';
+import Stripe from "stripe";
+import axios from "axios";
 import {
   createTransaction,
   findTransactionByAppointmentId,
   findTransactionByStripeIntentId,
   findTransactionsByPatientId,
   updateTransactionById,
-} from '../repositories/transactionRepository.js';
-import { createHttpError } from '../utils/httpError.js';
-import { publishPaymentEvent } from '../events/paymentPublisher.js';
+} from "../repositories/transactionRepository.js";
+import { createHttpError } from "../utils/httpError.js";
+import { publishPaymentEvent } from "../events/paymentPublisher.js";
 
 // Initialise Stripe with the secret key from env
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // ─── Internal call helper ────────────────────────────────────────────────────
-const internalHeaders = () => ({ 'x-internal-secret': process.env.INTERNAL_SECRET });
+const internalHeaders = () => ({
+  "x-internal-secret": process.env.INTERNAL_SECRET,
+});
 
 // ─── Fetch appointment from appointment-service ──────────────────────────────
 async function fetchAppointment(appointmentId) {
   try {
     const { data } = await axios.get(
       `${process.env.APPOINTMENT_SERVICE_URL}/api/appointments/internal/${appointmentId}`,
-      { headers: internalHeaders() }
+      { headers: internalHeaders() },
     );
     return data.data;
   } catch {
-    throw createHttpError('Appointment not found', 404);
+    throw createHttpError("Appointment not found", 404);
   }
 }
 
@@ -47,7 +49,7 @@ async function updateAppointmentPayment(appointmentId, updates) {
   await axios.patch(
     `${process.env.APPOINTMENT_SERVICE_URL}/api/appointments/internal/${appointmentId}/payment`,
     updates,
-    { headers: internalHeaders() }
+    { headers: internalHeaders() },
   );
 }
 
@@ -63,29 +65,37 @@ async function updateAppointmentPayment(appointmentId, updates) {
 //      e. Link transaction to appointment (paymentId)
 //      f. Return clientSecret to frontend (used by Stripe.js)
 // ─────────────────────────────────────────────────────────────────────────────
-export const createPaymentIntentService = async ({ appointmentId, patientId }) => {
+export const createPaymentIntentService = async ({
+  appointmentId,
+  patientId,
+}) => {
   // a. Fetch and validate appointment
   const appointment = await fetchAppointment(appointmentId);
 
   if (appointment.patientId !== patientId) {
-    throw createHttpError('Forbidden: this is not your appointment', 403);
+    throw createHttpError("Forbidden: this is not your appointment", 403);
   }
 
-  if (['cancelled', 'completed'].includes(appointment.status)) {
-    throw createHttpError(`Cannot pay for a ${appointment.status} appointment`, 400);
+  if (["cancelled", "completed"].includes(appointment.status)) {
+    throw createHttpError(
+      `Cannot pay for a ${appointment.status} appointment`,
+      400,
+    );
   }
 
-  if (appointment.paymentStatus === 'paid') {
-    throw createHttpError('This appointment has already been paid', 400);
+  if (appointment.paymentStatus === "paid") {
+    throw createHttpError("This appointment has already been paid", 400);
   }
 
   // b. Guard against double-payment initiation (idempotency)
   //    If a transaction already exists and is 'initiated', return the same clientSecret.
   const existing = await findTransactionByAppointmentId(appointmentId);
-  if (existing && existing.status === 'initiated') {
+  if (existing && existing.status === "initiated") {
     // Retrieve the fresh clientSecret from Stripe (in case it expired, we'd need
     // to create a new one, but for sandbox this is fine)
-    const intent = await stripe.paymentIntents.retrieve(existing.stripePaymentIntentId);
+    const intent = await stripe.paymentIntents.retrieve(
+      existing.stripePaymentIntentId,
+    );
     return {
       clientSecret: intent.client_secret,
       transactionId: existing._id,
@@ -97,12 +107,20 @@ export const createPaymentIntentService = async ({ appointmentId, patientId }) =
   // c. Create Stripe PaymentIntent
   //    amount is in smallest currency unit — LKR is a 2-decimal currency in Stripe
   //    so LKR 2500 → amount: 250000 (like USD cents)
+  const fee = appointment.consultationFee;
+  if (fee == null || isNaN(Number(fee))) {
+    throw createHttpError(
+      "Appointment has no consultation fee — cannot create payment",
+      400,
+    );
+  }
+
   const paymentIntent = await stripe.paymentIntents.create({
-    amount:   Math.round(appointment.consultationFee * 100),   // convert to smallest unit (cents)
-    currency: (appointment.currency || 'LKR').toLowerCase(),
+    amount: Math.round(Number(fee) * 100), // convert to smallest unit (cents)
+    currency: (appointment.currency || "LKR").toLowerCase(),
     metadata: {
       appointmentId: appointmentId.toString(),
-      patientId:     patientId.toString(),
+      patientId: patientId.toString(),
     },
     // This description appears on the patient's bank statement
     description: `HC Platform consultation payment — Appointment ${appointmentId}`,
@@ -110,26 +128,28 @@ export const createPaymentIntentService = async ({ appointmentId, patientId }) =
 
   // d. Save Transaction to DB
   const transaction = await createTransaction({
-    appointmentId:         appointmentId.toString(),
-    patientId:             patientId.toString(),
-    amount:                appointment.consultationFee,
-    currency:              appointment.currency || 'LKR',
-    status:                'initiated',
-    paymentMethod:         'card',
+    appointmentId: appointmentId.toString(),
+    patientId: patientId.toString(),
+    amount: Number(fee),
+    currency: appointment.currency || "LKR",
+    status: "initiated",
+    paymentMethod: "card",
     stripePaymentIntentId: paymentIntent.id,
-    stripeClientSecret:    paymentIntent.client_secret,
+    stripeClientSecret: paymentIntent.client_secret,
   });
 
   // e. Link transaction ID to appointment so appointment knows about this payment
-  await updateAppointmentPayment(appointmentId, { paymentId: transaction._id.toString() });
+  await updateAppointmentPayment(appointmentId, {
+    paymentId: transaction._id.toString(),
+  });
 
   // f. Return clientSecret — frontend uses this with Stripe.js to render the card form
   return {
-    clientSecret:          paymentIntent.client_secret,
+    clientSecret: paymentIntent.client_secret,
     stripePaymentIntentId: paymentIntent.id,
-    transactionId:         transaction._id,
-    amount:                appointment.consultationFee,
-    currency:              appointment.currency || 'LKR',
+    transactionId: transaction._id,
+    amount: appointment.consultationFee,
+    currency: appointment.currency || "LKR",
   };
 };
 
@@ -151,57 +171,65 @@ export const handleWebhookService = async (rawBody, stripeSignature) => {
     event = stripe.webhooks.constructEvent(
       rawBody,
       stripeSignature,
-      process.env.STRIPE_WEBHOOK_SECRET
+      process.env.STRIPE_WEBHOOK_SECRET,
     );
   } catch (err) {
-    throw createHttpError(`Webhook signature verification failed: ${err.message}`, 400);
+    throw createHttpError(
+      `Webhook signature verification failed: ${err.message}`,
+      400,
+    );
   }
 
   const stripeObject = event.data.object;
-  
+
   // Extract PaymentIntent ID based on event type
   // For payment_intent.* events: stripeObject.id is the PI ID
   // For charge.* events: stripeObject.payment_intent is the PI ID
-  const paymentIntentId = event.type.startsWith('charge.') 
-    ? stripeObject.payment_intent 
+  const paymentIntentId = event.type.startsWith("charge.")
+    ? stripeObject.payment_intent
     : stripeObject.id;
 
   // Find our Transaction record using the Stripe PaymentIntent ID
   const transaction = await findTransactionByStripeIntentId(paymentIntentId);
   if (!transaction) {
     // Unknown transaction — log and ignore (could be from another app in same Stripe account)
-    console.warn(`[PaymentService] Webhook: no transaction for intent ${paymentIntentId} (Event: ${event.type})`);
+    console.warn(
+      `[PaymentService] Webhook: no transaction for intent ${paymentIntentId} (Event: ${event.type})`,
+    );
     return { received: true };
   }
 
   // ── Success path ────────────────────────────────────────────────────────────
-  if (event.type === 'payment_intent.succeeded') {
+  if (event.type === "payment_intent.succeeded") {
     // Extract PCI-safe card metadata from the latest charge
-    const chargeId   = stripeObject.latest_charge;
-    let cardLast4    = null;
-    let cardBrand    = null;
+    const chargeId = stripeObject.latest_charge;
+    let cardLast4 = null;
+    let cardBrand = null;
     let cardExpMonth = null;
-    let cardExpYear  = null;
-    let cardCountry  = null;
+    let cardExpYear = null;
+    let cardCountry = null;
 
     if (chargeId) {
       try {
-        const charge    = await stripe.charges.retrieve(chargeId);
+        const charge = await stripe.charges.retrieve(chargeId);
         const cardDetails = charge.payment_method_details?.card;
-        cardLast4    = cardDetails?.last4    ?? null;
-        cardBrand    = cardDetails?.brand    ?? null;
+        cardLast4 = cardDetails?.last4 ?? null;
+        cardBrand = cardDetails?.brand ?? null;
         cardExpMonth = cardDetails?.exp_month ?? null;
-        cardExpYear  = cardDetails?.exp_year  ?? null;
-        cardCountry  = cardDetails?.country   ?? null;
+        cardExpYear = cardDetails?.exp_year ?? null;
+        cardCountry = cardDetails?.country ?? null;
       } catch (err) {
-        console.warn('[PaymentService] Could not retrieve charge details:', err.message);
+        console.warn(
+          "[PaymentService] Could not retrieve charge details:",
+          err.message,
+        );
       }
     }
 
     // Update transaction to completed with full card metadata
     await updateTransactionById(transaction._id, {
-      status:           'completed',
-      stripeChargeId:   chargeId || null,
+      status: "completed",
+      stripeChargeId: chargeId || null,
       cardLast4,
       cardBrand,
       cardExpMonth,
@@ -211,38 +239,50 @@ export const handleWebhookService = async (rawBody, stripeSignature) => {
     });
 
     // Notify appointment-service via event — it will mark paymentStatus: paid and status: confirmed
-    publishPaymentEvent('payment_succeeded', { appointmentId: transaction.appointmentId });
+    publishPaymentEvent("payment_succeeded", {
+      appointmentId: transaction.appointmentId,
+    });
 
-    console.log(`[PaymentService] Payment completed for appointment ${transaction.appointmentId}`);
+    console.log(
+      `[PaymentService] Payment completed for appointment ${transaction.appointmentId}`,
+    );
   }
 
   // ── Failure path ────────────────────────────────────────────────────────────
-  if (event.type === 'payment_intent.payment_failed') {
+  if (event.type === "payment_intent.payment_failed") {
     const failureReason =
-      stripeObject.last_payment_error?.message || 'Payment failed';
+      stripeObject.last_payment_error?.message || "Payment failed";
 
     await updateTransactionById(transaction._id, {
-      status:            'failed',
+      status: "failed",
       failureReason,
       webhookReceivedAt: new Date(),
     });
 
-    publishPaymentEvent('payment_failed', { appointmentId: transaction.appointmentId });
+    publishPaymentEvent("payment_failed", {
+      appointmentId: transaction.appointmentId,
+    });
 
-    console.warn(`[PaymentService] Payment failed for appointment ${transaction.appointmentId}: ${failureReason}`);
+    console.warn(
+      `[PaymentService] Payment failed for appointment ${transaction.appointmentId}: ${failureReason}`,
+    );
   }
 
   // ── Refund path (e.g. triggered from Stripe Dashboard) ──────────────────────
-  if (event.type === 'charge.refunded') {
+  if (event.type === "charge.refunded") {
     await updateTransactionById(transaction._id, {
-      status:            'refunded',
+      status: "refunded",
       webhookReceivedAt: new Date(),
     });
 
     // Notify appointment-service via event — it will update paymentStatus and cancel the appointment
-    publishPaymentEvent('payment_refunded', { appointmentId: transaction.appointmentId });
+    publishPaymentEvent("payment_refunded", {
+      appointmentId: transaction.appointmentId,
+    });
 
-    console.log(`[PaymentService] Refund processed for appointment ${transaction.appointmentId}`);
+    console.log(
+      `[PaymentService] Refund processed for appointment ${transaction.appointmentId}`,
+    );
   }
 
   return { received: true };
@@ -261,27 +301,33 @@ export const getMyTransactionsService = (patientId) =>
 // ─────────────────────────────────────────────────────────────────────────────
 export const refundPaymentService = async (appointmentId) => {
   const transaction = await findTransactionByAppointmentId(appointmentId);
-  if (!transaction) throw createHttpError('Transaction not found', 404);
+  if (!transaction) throw createHttpError("Transaction not found", 404);
 
-  if (transaction.status !== 'completed') {
-    throw createHttpError(`Cannot refund a transaction in ${transaction.status} status`, 400);
+  if (transaction.status !== "completed") {
+    throw createHttpError(
+      `Cannot refund a transaction in ${transaction.status} status`,
+      400,
+    );
   }
 
   // 1. Trigger Stripe Refund
-  let stripeRefundId = 'skipped_for_test';
+  let stripeRefundId = "skipped_for_test";
   try {
     const refund = await stripe.refunds.create({
       payment_intent: transaction.stripePaymentIntentId,
-      reason:         'requested_by_customer',
+      reason: "requested_by_customer",
     });
     stripeRefundId = refund.id;
   } catch (err) {
     // Robust check for various Stripe error message formats
-    const isNoChargeErr = /no successful charge/i.test(err.message) || 
-                          /does not have a successful charge/i.test(err.message);
+    const isNoChargeErr =
+      /no successful charge/i.test(err.message) ||
+      /does not have a successful charge/i.test(err.message);
 
     if (isNoChargeErr) {
-      console.warn(`[PaymentService] Skipped Stripe-side refund for intent ${transaction.stripePaymentIntentId} (No charge found on Stripe). Proceeding with local DB update.`);
+      console.warn(
+        `[PaymentService] Skipped Stripe-side refund for intent ${transaction.stripePaymentIntentId} (No charge found on Stripe). Proceeding with local DB update.`,
+      );
     } else {
       throw createHttpError(`Stripe Refund Failed: ${err.message}`, 400);
     }
@@ -289,15 +335,14 @@ export const refundPaymentService = async (appointmentId) => {
 
   // 2. Update local transaction record
   await updateTransactionById(transaction._id, {
-    status: 'refunded',
+    status: "refunded",
   });
 
   // 3. Notify appointment-service via event — it will update paymentStatus and cancel the appointment
-  publishPaymentEvent('payment_refunded', { appointmentId });
+  publishPaymentEvent("payment_refunded", { appointmentId });
 
   return {
     refundId: stripeRefundId,
-    status:   'refunded',
+    status: "refunded",
   };
 };
-

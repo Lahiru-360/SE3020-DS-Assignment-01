@@ -24,7 +24,11 @@ export const analyzeSymptoms = async (symptoms) => {
           "specialty": "Cardiologist",
           "reason": "One sentence explanation why",
           "urgency": "normal",
-          "warning": null
+          "warning": null,
+          "warningSigns": ["Chest pain spreading to arm", "Difficulty breathing"],
+          "homeRemedies": ["Rest, avoid exertion", "Stay hydrated"],
+          "medicationsToAvoid": ["Ibuprofen", "Aspirin without doctor advice"],
+          "disclaimer": "These are general suggestions only. Always follow your doctor's advice."
         }
 
         The "specialty" must be exactly one of the following:
@@ -37,6 +41,8 @@ export const analyzeSymptoms = async (symptoms) => {
         4. Otherwise, set "urgency" to "normal" and "warning" to null.
         5. If the symptoms are unclear, default to "General Physician" with "urgency" as "normal".
         6. The "reason" should be a concise, professional explanation for the suggestion.
+        7. For "warningSigns", "homeRemedies", and "medicationsToAvoid", provide relevant health suggestions based on the symptoms.
+        8. The "disclaimer" must always be: "These are general suggestions only. Always follow your doctor's advice."
 
         Response (JSON only):
       `;
@@ -54,10 +60,11 @@ export const analyzeSymptoms = async (symptoms) => {
       
       const parsed = JSON.parse(jsonMatch[0]);
 
-      // Safety check: force standardized warning if Gemini missed it but flagged emergency
+      // Safety check: force standardized warning/disclaimer
       if (parsed.urgency === 'emergency' && !parsed.warning) {
         parsed.warning = "IMMEDIATE ACTION REQUIRED: Please proceed to the nearest Emergency Room or call emergency services immediately.";
       }
+      parsed.disclaimer = "These are general suggestions only. Always follow your doctor's advice.";
 
       return parsed;
     } catch (error) {
@@ -73,6 +80,10 @@ export const analyzeSymptoms = async (symptoms) => {
     specialty: 'General Physician',
     reason: 'Based on the input provided, we recommend seeing a general physician for an initial assessment.',
     urgency: 'normal',
-    warning: null
+    warning: null,
+    warningSigns: [],
+    homeRemedies: ["Rest and monitor symptoms"],
+    medicationsToAvoid: ["Avoid taking medication without consulting a doctor"],
+    disclaimer: "These are general suggestions only. Always follow your doctor's advice."
   };
 };

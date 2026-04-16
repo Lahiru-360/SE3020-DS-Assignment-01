@@ -156,11 +156,41 @@ export const getPrescriptionByIdForUserService = async (id, requesterId) => {
   return prescription;
 };
 
-export const getPrescriptionsByPatientIdService = async (patientId) =>
-  findPrescriptionsByPatientId(patientId);
+export const getPrescriptionsByPatientIdService = async (patientId) => {
+  const prescriptions = await findPrescriptionsByPatientId(patientId);
+  return Promise.all(
+    prescriptions.map(async (p) => {
+      const doctor = await findDoctorByUserId(p.doctorId).catch(() => null);
+      return {
+        ...p.toObject(),
+        doctorName: doctor
+          ? `${doctor.firstName} ${doctor.lastName}`.trim()
+          : null,
+      };
+    }),
+  );
+};
 
-export const getPrescriptionsByDoctorIdService = async (doctorId) =>
-  findPrescriptionsByDoctorId(doctorId);
+export const getPrescriptionsByDoctorIdService = async (doctorId) => {
+  const prescriptions = await findPrescriptionsByDoctorId(doctorId);
+  return Promise.all(
+    prescriptions.map(async (p) => {
+      let patientName = null;
+      try {
+        const res = await axios.get(
+          `${process.env.PATIENT_SERVICE_URL}/api/patients/internal/${p.patientId}`,
+          { headers: { "x-internal-secret": process.env.INTERNAL_SECRET } },
+        );
+        const patient = res.data?.data;
+        if (patient)
+          patientName = `${patient.firstName} ${patient.lastName}`.trim();
+      } catch {
+        // name enrichment is best-effort — ID still present as fallback
+      }
+      return { ...p.toObject(), patientName };
+    }),
+  );
+};
 
 export const verifyPrescriptionService = async (id) => {
   const prescription = await findPrescriptionById(id);
@@ -217,13 +247,13 @@ export const generatePrescriptionPdfForUserService = async (
     );
     doc.on("error", reject);
 
-    // ───────── HEADER ─────────
+    //  HEADER
     doc.image(logoPath, 50, 40, { width: 50 });
 
     doc
       .fontSize(20)
       .fillColor(COLORS.primary)
-      .text("SafeMother Health Platform", 110, 45);
+      .text("CareLink Health Platform", 110, 45);
 
     doc
       .fontSize(10)
@@ -236,7 +266,7 @@ export const generatePrescriptionPdfForUserService = async (
 
     doc.moveDown();
 
-    // ───────── DETAILS ─────────
+    //  DETAILS
     doc.fontSize(12).fillColor(COLORS.textPrimary);
 
     doc.text(`Prescription ID: ${prescription._id}`);
@@ -257,7 +287,7 @@ export const generatePrescriptionPdfForUserService = async (
 
     doc.moveDown();
 
-    // ───────── DIAGNOSIS ─────────
+    //  DIAGNOSIS
     doc
       .fontSize(14)
       .fillColor(COLORS.primary)
@@ -267,7 +297,7 @@ export const generatePrescriptionPdfForUserService = async (
 
     doc.moveDown();
 
-    // ───────── TABLE (FIXED ALIGNMENT) ─────────
+    //  TABLE
     const colX = {
       name: 50,
       dosage: 180,
@@ -312,9 +342,9 @@ export const generatePrescriptionPdfForUserService = async (
 
     doc.moveDown();
 
-    // ───────── NOTES (FIXED POSITION RIGHT SIDE) ─────────
+    //  NOTES
     if (prescription.notes) {
-      const notesX = 350; // 👉 move to right side
+      const notesX = 350;
       let notesY = doc.y;
 
       doc
@@ -334,7 +364,7 @@ export const generatePrescriptionPdfForUserService = async (
       doc.moveDown();
     }
 
-    // ───────── FOOTER (FIXED POSITION) ─────────
+    //  FOOTER
     const pageHeight = doc.page.height;
 
     doc
