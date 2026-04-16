@@ -190,6 +190,17 @@ services:
     networks:
       - hc-network
 
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: hc-client
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:5000/api
+
 
 volumes:
   mongo_data:

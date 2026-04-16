@@ -1,9 +1,12 @@
 import axios from "axios";
 
+const resolvedBaseURL =
+  (typeof window !== "undefined" && window.__HC_ENV__?.VITE_API_BASE_URL) ||
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://localhost:30500/api";
+
 const axiosInstance = axios.create({
-  // Set VITE_API_BASE_URL=http://localhost:5000/api in your .env file.
-  // The fallback targets the API Gateway running locally.
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:30500/api",
+  baseURL: resolvedBaseURL,
   headers: {
     "Content-Type": "application/json",
   },
