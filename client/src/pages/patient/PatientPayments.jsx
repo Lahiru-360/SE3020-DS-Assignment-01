@@ -170,8 +170,8 @@ function PayModal({ appointments, onClose, onSuccess }) {
                   {unpaidAppointments.map((a) => (
                     <option key={a._id} value={a._id}>
                       {formatDate(a.date)} — Dr.{" "}
-                      {a.doctorName ?? a.doctorId ?? "Unknown"} (
-                      {a.type ?? "Physical"})
+                      {a.doctorName ?? "Unknown Doctor"} ({a.type ?? "Physical"}
+                      )
                     </option>
                   ))}
                 </select>
@@ -334,9 +334,11 @@ export default function PatientPayments() {
                           {linkedAppt
                             ? `${formatDate(linkedAppt.date)} — ${linkedAppt.type ?? "PHYSICAL"}`
                             : "Appointment"}
-                          <span className="ml-1.5 font-mono text-[10px] text-text-muted">
-                            {tx.appointmentId}
-                          </span>
+                          {linkedAppt?.doctorName && (
+                            <span className="ml-1.5 text-[10px] text-text-muted">
+                              Dr. {linkedAppt.doctorName}
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-text-muted">
                           {formatDate(tx.createdAt)}

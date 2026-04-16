@@ -319,7 +319,7 @@ export default function PatientBookingPage() {
                                 <p className="text-text-primary font-medium">
                                   {doctor
                                     ? `Dr. ${doctor.firstName} ${doctor.lastName}`
-                                    : doctorId}
+                                    : "Unknown Doctor"}
                                 </p>
                               </div>
                               <div>

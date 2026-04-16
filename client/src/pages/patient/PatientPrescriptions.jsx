@@ -198,6 +198,11 @@ function PrescriptionCard({ prescription, onSelect }) {
           <p className="text-xs text-text-muted mt-0.5">
             Issued: {formatDate(prescription.issuedDate)}
           </p>
+          {prescription.doctorName && (
+            <p className="text-xs text-text-secondary mt-0.5 font-medium">
+              Dr. {prescription.doctorName}
+            </p>
+          )}
         </div>
         <StatusBadge status="completed" />
       </div>

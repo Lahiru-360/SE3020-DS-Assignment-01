@@ -343,7 +343,7 @@ function AppointmentDetailModal({
               <p className="text-sm font-medium text-text-primary leading-snug">
                 {appt.doctorName
                   ? `Dr. ${appt.doctorName}${appt.doctorSpecialization ? ` · ${appt.doctorSpecialization}` : ""}`
-                  : (appt.doctorId ?? "—")}
+                  : "Unknown Doctor"}
               </p>
             </div>
           </div>
@@ -554,9 +554,9 @@ function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
               </span>
             )}
           </p>
-          {(appt.doctorName || appt.doctorId) && (
+          {appt.doctorName && (
             <p className="text-xs text-text-secondary mt-0.5 font-medium">
-              Dr. {appt.doctorName ?? appt.doctorId}
+              Dr. {appt.doctorName}
               {appt.doctorSpecialization && (
                 <span className="font-normal text-text-muted">
                   {" "}
