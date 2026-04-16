@@ -7,7 +7,7 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
-import { analyzeSymptoms } from "../../api/patientService";
+import { analyzeSymptoms } from "../../api/aiService";
 import Alert from "../../components/ui/Alert";
 
 // ── Urgency config ─────────────────────────────────────────────────────────

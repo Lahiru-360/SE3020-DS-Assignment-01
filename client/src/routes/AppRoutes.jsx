@@ -147,6 +147,13 @@ export const appRoutes = [
     hideChrome: true,
   },
   {
+    path: "/patient/smart-match",
+    component: User,
+    requiresAuth: true,
+    allowedRoles: ["patient"],
+    hideChrome: true,
+  },
+  {
     path: "/patient/doctors/:doctorId",
     component: PatientBookingPage,
     requiresAuth: true,
