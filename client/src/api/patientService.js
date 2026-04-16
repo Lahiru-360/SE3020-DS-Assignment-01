@@ -70,3 +70,26 @@ export const downloadPrescriptionPdf = (prescriptionId) =>
   axiosInstance.get(`/prescriptions/${prescriptionId}/pdf`, {
     responseType: "blob",
   });
+
+// Payments
+
+/**
+ * Initiate a Stripe payment intent for an appointment.
+ * @param {string} appointmentId
+ */
+export const createPaymentIntent = (appointmentId) =>
+  axiosInstance.post("/payments/create-intent", { appointmentId });
+
+/**
+ * Get the patient's own payment/transaction history.
+ */
+export const getMyPayments = () => axiosInstance.get("/payments/my");
+
+// AI Smart Match
+
+/**
+ * Analyze symptoms and get a doctor specialty recommendation + matched doctors.
+ * @param {string} symptoms — plain-text description (10–2000 chars)
+ */
+export const analyzeSymptoms = (symptoms) =>
+  axiosInstance.post("/ai/analyze", { symptoms });

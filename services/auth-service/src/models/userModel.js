@@ -13,8 +13,6 @@ const UserSchema = new mongoose.Schema(
       type: String,
       required: true,
       minlength: 8,
-      // Password is hashed with bcrypt (cost factor 12) in authService
-      // before being persisted. Never stored in plain text.
     },
     role: {
       type: String,
@@ -22,9 +20,6 @@ const UserSchema = new mongoose.Schema(
       enum: ['patient', 'doctor', 'admin'],
       default: 'patient',
     },
-    // refId points to the profile document in the respective
-    // service DB (doctor-service or patient-service).
-    // Populated after profile creation in the relevant service.
     refId: {
       type: String,
       default: null,

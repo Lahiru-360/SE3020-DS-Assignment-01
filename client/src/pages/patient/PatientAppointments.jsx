@@ -12,6 +12,8 @@ import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 import StatusBadge from "../../components/ui/StatusBadge";
 import FormInput from "../../components/ui/FormInput";
+import StripeCheckout from "../../components/ui/StripeCheckout";
+import TelemedicineButton from "../../components/ui/TelemedicineButton";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -28,6 +30,68 @@ function formatDate(dateStr) {
 function formatShortDate(dateStr) {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("en-US", { dateStyle: "medium" });
+}
+
+// ── PaymentStatusBadge ─────────────────────────────────────────────────────
+
+const PAYMENT_STATUS_STYLES = {
+  unpaid: {
+    bg: "rgba(244, 167, 50, 0.12)",
+    color: "var(--color-warning)",
+    border: "var(--color-warning)",
+    label: "Unpaid",
+  },
+  paid: {
+    bg: "rgba(39, 174, 122, 0.12)",
+    color: "var(--color-success)",
+    border: "var(--color-success)",
+    label: "Paid",
+  },
+  failed: {
+    bg: "rgba(231, 76, 60, 0.12)",
+    color: "var(--color-error)",
+    border: "var(--color-error)",
+    label: "Failed",
+  },
+  refunded: {
+    bg: "rgba(26, 111, 168, 0.12)",
+    color: "var(--color-primary)",
+    border: "var(--color-primary)",
+    label: "Refunded",
+  },
+};
+
+function PaymentStatusBadge({ status }) {
+  const key = (status || "unpaid").toLowerCase();
+  const style = PAYMENT_STATUS_STYLES[key] || PAYMENT_STATUS_STYLES.unpaid;
+  return (
+    <span
+      className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+      style={{
+        backgroundColor: style.bg,
+        color: style.color,
+        borderColor: style.border,
+      }}
+    >
+      {style.label}
+    </span>
+  );
+}
+
+/** Whether the appointment is eligible for payment */
+function canPayAppointment(appt) {
+  return (
+    appt.status === "confirmed" &&
+    appt.paymentStatus === "unpaid"
+  );
+}
+
+/** Whether the appointment allows retrying a failed payment */
+function canRetryPayment(appt) {
+  return (
+    appt.status === "confirmed" &&
+    appt.paymentStatus === "failed"
+  );
 }
 
 // ── CloseButton ────────────────────────────────────────────────────────────
@@ -173,8 +237,11 @@ function AppointmentDetailModal({
   onClose,
   onCancel,
   cancelling,
+  onPaymentSuccess,
 }) {
   const isCompleted = appt.status === "completed";
+  const isVirtualConfirmed =
+    appt.type === "VIRTUAL" && appt.status === "confirmed";
 
   // null = loading · "none" = no prescription · object = has prescription
   const [prescription, setPrescription] = useState(null);
@@ -182,6 +249,16 @@ function AppointmentDetailModal({
   const [prescError, setPrescError] = useState("");
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState("");
+
+  // Payment state
+  const [showStripeCheckout, setShowStripeCheckout] = useState(false);
+  const [paymentDone, setPaymentDone] = useState(false);
+
+  // Telemedicine state
+  const [teleError, setTeleError] = useState("");
+
+  const showPayBtn =
+    !paymentDone && (canPayAppointment(appt) || canRetryPayment(appt));
 
   // Fetch prescription on mount (completed appointments only)
   useEffect(() => {
@@ -268,9 +345,11 @@ function AppointmentDetailModal({
               </p>
             </div>
             <div>
-              <p className="text-xs text-text-muted mb-0.5">Doctor ID</p>
-              <p className="text-xs font-mono text-text-secondary break-all leading-snug">
-                {appt.doctorId ?? "—"}
+              <p className="text-xs text-text-muted mb-0.5">Doctor</p>
+              <p className="text-sm font-medium text-text-primary leading-snug">
+                {appt.doctorName
+                  ? `Dr. ${appt.doctorName}${appt.doctorSpecialization ? ` · ${appt.doctorSpecialization}` : ""}`
+                  : (appt.doctorId ?? "—")}
               </p>
             </div>
           </div>
@@ -289,6 +368,115 @@ function AppointmentDetailModal({
             <p className="text-xs font-mono text-text-muted break-all">
               {appt._id}
             </p>
+          </div>
+
+          {/* Virtual Consultation section — confirmed VIRTUAL appointments only */}
+          {isVirtualConfirmed && (
+            <div className="border-t border-border pt-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-text-primary">
+                  Virtual Consultation
+                </p>
+                <span
+                  className="text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+                  style={{
+                    backgroundColor: "rgba(62, 168, 197, 0.12)",
+                    color: "var(--color-primary-soft)",
+                    borderColor: "var(--color-primary-soft)",
+                  }}
+                >
+                  VIRTUAL
+                </span>
+              </div>
+              <p className="text-xs text-text-muted">
+                Your session is ready. Click below to join your doctor.
+              </p>
+              {teleError && <Alert type="error">{teleError}</Alert>}
+              <TelemedicineButton
+                appointmentId={appt._id}
+                onError={setTeleError}
+                size="md"
+              />
+            </div>
+          )}
+
+          {/* Payment section */}
+          <div className="border-t border-border pt-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-text-primary">Payment</p>
+              <PaymentStatusBadge
+                status={paymentDone ? "paid" : appt.paymentStatus}
+              />
+            </div>
+
+            {!showStripeCheckout &&
+              !paymentDone &&
+              appt.consultationFee != null && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-text-muted">Consultation Fee</span>
+                  <span className="font-semibold text-text-primary">
+                    {appt.currency ?? "LKR"}{" "}
+                    {Number(appt.consultationFee).toLocaleString("en-LK")}
+                  </span>
+                </div>
+              )}
+
+            {paymentDone && (
+              <div
+                className="rounded-lg border bg-bg-main px-4 py-3 flex items-center gap-3"
+                style={{ borderColor: "var(--color-success)" }}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  style={{ color: "var(--color-success)" }}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <p
+                  className="text-sm font-semibold"
+                  style={{ color: "var(--color-success)" }}
+                >
+                  Payment completed! Your appointment will be confirmed shortly.
+                </p>
+              </div>
+            )}
+
+            {!paymentDone && showStripeCheckout && (
+              <StripeCheckout
+                appointment={appt}
+                onSuccess={() => {
+                  setPaymentDone(true);
+                  setShowStripeCheckout(false);
+                  onPaymentSuccess?.();
+                }}
+                onCancel={() => setShowStripeCheckout(false)}
+              />
+            )}
+
+            {!paymentDone && !showStripeCheckout && showPayBtn && (
+              <button
+                type="button"
+                onClick={() => setShowStripeCheckout(true)}
+                className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors"
+              >
+                {canRetryPayment(appt) ? "Retry Payment" : "Pay Now"}
+              </button>
+            )}
+
+            {!paymentDone && appt.paymentStatus === "paid" && (
+              <p className="text-xs" style={{ color: "var(--color-success)" }}>
+                Payment completed successfully.
+              </p>
+            )}
           </div>
 
           {/* Cancel button */}
@@ -342,6 +530,8 @@ function AppointmentDetailModal({
 
 function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
   const canCancel = appt.status === "pending" || appt.status === "confirmed";
+  const showPay = canPayAppointment(appt) || canRetryPayment(appt);
+  const [cardTeleError, setCardTeleError] = useState("");
 
   return (
     <div
@@ -363,17 +553,46 @@ function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
           </p>
           <p className="text-xs text-text-muted mt-0.5">
             {appt.type ?? "PHYSICAL"}
+            {appt.consultationFee != null && (
+              <span className="ml-2">
+                · {appt.currency ?? "LKR"}{" "}
+                {Number(appt.consultationFee).toLocaleString("en-LK")}
+              </span>
+            )}
           </p>
+          {(appt.doctorName || appt.doctorId) && (
+            <p className="text-xs text-text-secondary mt-0.5 font-medium">
+              Dr. {appt.doctorName ?? appt.doctorId}
+              {appt.doctorSpecialization && (
+                <span className="font-normal text-text-muted"> · {appt.doctorSpecialization}</span>
+              )}
+            </p>
+          )}
         </div>
-        <StatusBadge status={appt.status} />
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <StatusBadge status={appt.status} />
+          <PaymentStatusBadge status={appt.paymentStatus} />
+        </div>
       </div>
 
       {appt.notes && (
         <p className="text-xs text-text-secondary line-clamp-2">{appt.notes}</p>
       )}
 
-      {canCancel && (
-        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="flex items-center justify-end gap-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {showPay && (
+          <button
+            type="button"
+            onClick={() => onSelect(appt)}
+            className="px-4 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors"
+          >
+            {canRetryPayment(appt) ? "Retry Payment" : "Pay Now"}
+          </button>
+        )}
+        {canCancel && (
           <button
             type="button"
             onClick={() => onCancel(appt._id)}
@@ -382,7 +601,22 @@ function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
           >
             {cancelling === appt._id ? "Cancelling…" : "Cancel"}
           </button>
-        </div>
+        )}
+        {appt.type === "VIRTUAL" && appt.status === "confirmed" && (
+          <TelemedicineButton
+            appointmentId={appt._id}
+            onError={setCardTeleError}
+            size="sm"
+          />
+        )}
+      </div>
+      {cardTeleError && (
+        <p
+          className="text-xs font-medium mt-1 px-1"
+          style={{ color: "var(--color-error)" }}
+        >
+          {cardTeleError}
+        </p>
       )}
     </div>
   );
@@ -684,6 +918,7 @@ export default function PatientAppointments() {
           onClose={() => setSelectedAppt(null)}
           onCancel={handleCancel}
           cancelling={cancelling}
+          onPaymentSuccess={fetchAppointments}
         />
       )}
     </div>

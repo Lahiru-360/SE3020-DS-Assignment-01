@@ -161,7 +161,8 @@ export default function DoctorOverview() {
                       </span>
                       <span className="text-xs text-text-muted">
                         {appt.type ?? "—"}{" "}
-                        {appt.patientId && `· Patient: ${appt.patientId}`}
+                        {(appt.patientName ?? appt.patientId) &&
+                          `· Patient: ${appt.patientName ?? appt.patientId}`}
                       </span>
                     </div>
                     <StatusBadge status={appt.status} />

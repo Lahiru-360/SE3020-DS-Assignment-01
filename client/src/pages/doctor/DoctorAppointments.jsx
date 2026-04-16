@@ -7,9 +7,11 @@ import {
   getDoctorPrescriptions,
   downloadPrescriptionPdf,
 } from "../../api/doctorService";
+import { endSession } from "../../api/telemedicineService";
 import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 import StatusBadge from "../../components/ui/StatusBadge";
+import TelemedicineButton from "../../components/ui/TelemedicineButton";
 import PrescriptionForm from "./PrescriptionForm";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -146,6 +148,8 @@ function PrescriptionView({ prescription }) {
 
 function AppointmentDetailModal({ appt, userId, onClose, onAction, acting }) {
   const isCompleted = appt.status === "completed";
+  const isVirtualConfirmed =
+    appt.type === "VIRTUAL" && appt.status === "confirmed";
 
   // null = not yet loaded · "none" = loaded, no presc · object = has presc
   const [prescription, setPrescription] = useState(null);
@@ -157,6 +161,28 @@ function AppointmentDetailModal({ appt, userId, onClose, onAction, acting }) {
 
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState("");
+
+  // Telemedicine state (doctor-only: join + end session)
+  const [teleError, setTeleError] = useState("");
+  const [endingSession, setEndingSession] = useState(false);
+  const [sessionEnded, setSessionEnded] = useState(false);
+
+  const handleEndSession = async (e) => {
+    e.stopPropagation();
+    setEndingSession(true);
+    setTeleError("");
+    try {
+      await endSession(appt._id);
+      setSessionEnded(true);
+    } catch (err) {
+      setTeleError(
+        err.response?.data?.message ??
+          "Failed to end session. Please try again.",
+      );
+    } finally {
+      setEndingSession(false);
+    }
+  };
 
   // Fetch prescription once on mount (completed appointments only)
   useEffect(() => {
@@ -250,9 +276,9 @@ function AppointmentDetailModal({ appt, userId, onClose, onAction, acting }) {
               </p>
             </div>
             <div>
-              <p className="text-xs text-text-muted mb-0.5">Patient ID</p>
-              <p className="text-xs font-mono text-text-secondary break-all leading-snug">
-                {appt.patientId ?? "—"}
+              <p className="text-xs text-text-muted mb-0.5">Patient</p>
+              <p className="text-sm font-medium text-text-primary leading-snug">
+                {appt.patientName ?? appt.patientId ?? "—"}
               </p>
             </div>
           </div>
@@ -272,6 +298,75 @@ function AppointmentDetailModal({ appt, userId, onClose, onAction, acting }) {
               {appt._id}
             </p>
           </div>
+
+          {/* Virtual Consultation section — confirmed VIRTUAL appointments */}
+          {isVirtualConfirmed && (
+            <div className="border-t border-border pt-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-text-primary">
+                  Virtual Consultation
+                </p>
+                <span
+                  className="text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+                  style={{
+                    backgroundColor: "rgba(62, 168, 197, 0.12)",
+                    color: "var(--color-primary-soft)",
+                    borderColor: "var(--color-primary-soft)",
+                  }}
+                >
+                  VIRTUAL
+                </span>
+              </div>
+
+              {teleError && <Alert type="error">{teleError}</Alert>}
+
+              {sessionEnded ? (
+                <div
+                  className="rounded-lg border bg-bg-main px-4 py-3 flex items-center gap-2"
+                  style={{ borderColor: "var(--color-success)" }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    style={{ color: "var(--color-success)" }}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  <p
+                    className="text-sm font-semibold"
+                    style={{ color: "var(--color-success)" }}
+                  >
+                    Session ended successfully.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex gap-3">
+                  <TelemedicineButton
+                    appointmentId={appt._id}
+                    onError={setTeleError}
+                    size="sm"
+                    className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleEndSession}
+                    disabled={endingSession}
+                    className="flex-1 py-2 rounded-lg border border-error text-error text-sm font-semibold hover:bg-error-bg disabled:opacity-50 transition-colors"
+                  >
+                    {endingSession ? "Ending…" : "End Session"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Action buttons */}
           {actions.length > 0 && (
@@ -384,6 +479,7 @@ function AppointmentDetailModal({ appt, userId, onClose, onAction, acting }) {
 
 function AppointmentCard({ appt, onAction, acting, onSelect }) {
   const actions = ACTIONS[appt.status] ?? [];
+  const [cardTeleError, setCardTeleError] = useState("");
 
   return (
     <div
@@ -404,7 +500,9 @@ function AppointmentCard({ appt, onAction, acting, onSelect }) {
               </span>
             )}
           </p>
-          <p className="text-xs text-text-muted mt-0.5">ID: {appt._id}</p>
+          <p className="text-xs text-text-secondary mt-0.5 font-medium">
+            {appt.patientName ?? appt.patientId ?? "Patient"}
+          </p>
         </div>
         <StatusBadge status={appt.status} />
       </div>
@@ -413,14 +511,16 @@ function AppointmentCard({ appt, onAction, acting, onSelect }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <p className="text-xs text-text-muted">Type</p>
-          <p className="text-sm text-text-primary font-medium mt-0.5">
-            {appt.type ?? "—"}
-          </p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <p className="text-sm text-text-primary font-medium">
+              {appt.type ?? "—"}
+            </p>
+          </div>
         </div>
         <div>
-          <p className="text-xs text-text-muted">Patient ID</p>
+          <p className="text-xs text-text-muted">Patient</p>
           <p className="text-sm text-text-primary font-medium mt-0.5 truncate">
-            {appt.patientId ?? "—"}
+            {appt.patientName ?? appt.patientId ?? "—"}
           </p>
         </div>
       </div>
@@ -473,7 +573,35 @@ function AppointmentCard({ appt, onAction, acting, onSelect }) {
                   : "Cancel"}
             </button>
           )}
+          {/* Join Session quick-action for confirmed virtual appointments */}
+          {appt.type === "VIRTUAL" && appt.status === "confirmed" && (
+            <TelemedicineButton
+              appointmentId={appt._id}
+              onError={setCardTeleError}
+              size="sm"
+            />
+          )}
         </div>
+      )}
+      {/* Join Session for confirmed virtual appointments (no other quick-actions) */}
+      {actions.length === 0 &&
+        appt.type === "VIRTUAL" &&
+        appt.status === "confirmed" && (
+          <div className="flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
+            <TelemedicineButton
+              appointmentId={appt._id}
+              onError={setCardTeleError}
+              size="sm"
+            />
+          </div>
+        )}
+      {cardTeleError && (
+        <p
+          className="text-xs font-medium mt-1 px-1"
+          style={{ color: "var(--color-error)" }}
+        >
+          {cardTeleError}
+        </p>
       )}
     </div>
   );

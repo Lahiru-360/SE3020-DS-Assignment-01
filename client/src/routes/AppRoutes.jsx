@@ -6,7 +6,7 @@ const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("../pages/ResetPassword"));
 const Admin = lazy(() => import("../pages/Admin"));
 const NotFound = lazy(() => import("../pages/NotFound"));
-const User = lazy(() => import("../pages/Mother"));
+const User = lazy(() => import("../pages/Patient"));
 const Doctor = lazy(() => import("../pages/Doctor"));
 const PatientBookingPage = lazy(
   () => import("../pages/patient/PatientBookingPage"),

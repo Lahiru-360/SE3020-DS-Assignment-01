@@ -7,10 +7,15 @@ import cors from 'cors';
 import morgan from 'morgan';
 
 import { connectDB } from './config/db.js';
+import { connectRabbitMQ } from './config/rabbitmq.js';
 import telemedicineRoutes from './routes/telemedicineRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 connectDB();
+
+// Connect to RabbitMQ so the session publisher has a channel ready.
+// connectRabbitMQ retries indefinitely with no consumers to start here.
+connectRabbitMQ();
 
 const app = express();
 

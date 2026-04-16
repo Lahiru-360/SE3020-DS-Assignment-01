@@ -7,10 +7,19 @@ import cors from 'cors';
 import morgan from 'morgan';
 
 import { connectDB } from './config/db.js';
+import { connectRabbitMQ } from './config/rabbitmq.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { startNotificationConsumer } from './events/notificationConsumer.js';
 
 connectDB();
+
+// Connect to RabbitMQ and start the appointment event consumer.
+// connectRabbitMQ retries indefinitely — the callback runs each time a fresh
+// connection is established, including after mid-runtime reconnects.
+connectRabbitMQ(async () => {
+  await startNotificationConsumer();
+});
 
 const app = express();
 

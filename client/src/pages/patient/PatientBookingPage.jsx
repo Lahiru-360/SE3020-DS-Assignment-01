@@ -16,7 +16,7 @@ import {
 import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 
-// ── Nav (mirrors Mother.jsx) ───────────────────────────────────────────────
+// ── Nav (mirrors Patient.jsx) ───────────────────────────────────────────────
 
 const PATIENT_NAV = [
   {
@@ -145,6 +145,9 @@ export default function PatientBookingPage() {
         phase: selectedSlot.phase,
         type: apptType,
         ...(notes.trim() && { notes: notes.trim() }),
+        ...(doctor?.consultationFee != null && {
+          consultationFee: doctor.consultationFee,
+        }),
       });
       setBookSuccess("Appointment booked successfully! Redirecting…");
       setTimeout(() => navigate("/patient/appointments"), 1800);

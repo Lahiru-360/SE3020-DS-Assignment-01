@@ -58,3 +58,12 @@ export const approveDoctor = (userId) =>
  */
 export const rejectDoctor = (userId) =>
   axiosInstance.delete(`/auth/admin/doctors/${userId}`);
+
+// ── Payments ───────────────────────────────────────────────────────────────
+
+/**
+ * Trigger a refund for a given appointment's payment.
+ * @param {string} appointmentId
+ */
+export const refundPayment = (appointmentId) =>
+  axiosInstance.post(`/payments/refund/${appointmentId}`);

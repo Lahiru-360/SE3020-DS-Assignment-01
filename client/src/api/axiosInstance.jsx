@@ -3,7 +3,7 @@ import axios from "axios";
 const axiosInstance = axios.create({
   // Set VITE_API_BASE_URL=http://localhost:5000/api in your .env file.
   // The fallback targets the API Gateway running locally.
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:30500/api",
   headers: {
     "Content-Type": "application/json",
   },
@@ -40,7 +40,7 @@ axiosInstance.interceptors.response.use(
       window.location.href = "/login";
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default axiosInstance;

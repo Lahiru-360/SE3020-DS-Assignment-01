@@ -67,8 +67,6 @@ export const logout = async (req, res, next) => {
   }
 };
 
-// ─── Admin controllers ─────────────────────────────────────────────────────
-
 const requireAdmin = (req, res, next) => {
   if (req.headers['x-user-role'] !== 'admin') {
     return sendError(res, 'Admin access required', 403);
@@ -111,8 +109,6 @@ export const rejectDoctor = [
     }
   },
 ];
-
-// ─── Admin user-management controllers ────────────────────────────────────
 
 export const getAllUsers = [
   requireAdmin,

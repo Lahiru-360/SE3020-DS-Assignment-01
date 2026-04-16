@@ -153,7 +153,12 @@ export default function PatientOverview() {
                     )}
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">
-                    {appt.type ?? "PHYSICAL"} · Dr. ID: {appt.doctorId}
+                    {appt.type ?? "PHYSICAL"}
+                    {appt.doctorName
+                      ? ` · Dr. ${appt.doctorName}`
+                      : appt.doctorId
+                        ? ` · Dr. ID: ${appt.doctorId}`
+                        : ""}
                   </p>
                 </div>
                 <StatusBadge status={appt.status} />
