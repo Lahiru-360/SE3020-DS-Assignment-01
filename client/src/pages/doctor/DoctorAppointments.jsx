@@ -669,16 +669,22 @@ export default function DoctorAppointments() {
 
   // ── Derived ──────────────────────────────────────────────────────────────
 
+  // Exclude unpaid appointments — doctor only sees appointments that have
+  // been paid for (or don't require payment).
+  const visibleAppointments = appointments.filter(
+    (a) => a.paymentStatus !== "unpaid",
+  );
+
   const filtered =
     activeFilter === "all"
-      ? appointments
-      : appointments.filter((a) => a.status === activeFilter);
+      ? visibleAppointments
+      : visibleAppointments.filter((a) => a.status === activeFilter);
 
   const counts = FILTERS.reduce((acc, f) => {
     acc[f] =
       f === "all"
-        ? appointments.length
-        : appointments.filter((a) => a.status === f).length;
+        ? visibleAppointments.length
+        : visibleAppointments.filter((a) => a.status === f).length;
     return acc;
   }, {});
 
