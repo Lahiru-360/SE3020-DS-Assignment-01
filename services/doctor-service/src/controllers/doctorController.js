@@ -8,6 +8,7 @@ import {
   deleteDoctorProfileService,
   searchDoctorsService,
 } from "../services/doctorService.js";
+// getOwnProfile uses getDoctorByUserIdService — already imported above
 import { sendSuccess, sendError } from "../utils/responseHelper.js";
 
 export const createProfile = async (req, res, next) => {
@@ -44,12 +45,32 @@ export const updateProfile = async (req, res, next) => {
   }
 };
 
+export const getOwnProfile = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const authenticatedUserId = req.headers["x-user-id"];
+
+    if (!authenticatedUserId || authenticatedUserId !== userId) {
+      return sendError(
+        res,
+        "Forbidden: you can only view your own profile",
+        403,
+      );
+    }
+
+    const doctor = await getDoctorByUserIdService(userId);
+    return sendSuccess(res, doctor, "Doctor profile retrieved", 200);
+  } catch (e) {
+    next(e);
+  }
+};
+
 // ─── Internal lookup (called by appointment-service) ──────────────────────
 
 export const getDoctorInternal = async (req, res, next) => {
   try {
     const doctor = await getDoctorByUserIdService(req.params.userId);
-    return sendSuccess(res, doctor, 'Doctor profile retrieved');
+    return sendSuccess(res, doctor, "Doctor profile retrieved");
   } catch (e) {
     next(e);
   }
@@ -90,7 +111,7 @@ export const searchDoctors = async (req, res, next) => {
   try {
     const { specialization, name } = req.query;
     const doctors = await searchDoctorsService({ specialization, name });
-    return sendSuccess(res, doctors, 'Doctors retrieved');
+    return sendSuccess(res, doctors, "Doctors retrieved");
   } catch (e) {
     next(e);
   }

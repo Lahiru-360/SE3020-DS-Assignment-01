@@ -13,3 +13,6 @@ export const updateAvailability = (id, data) =>
     new: true,
     runValidators: true,
   });
+
+export const deleteAvailabilityByDoctorAndDate = (doctorId, date) =>
+  AvailabilityModel.deleteOne({ doctorId, date });

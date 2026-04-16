@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  /* 🩺 Brand Colors (Telemedicine Theme) */
+  --color-primary: #1a6fa8; /* Ocean Blue */
+  --color-primary-soft: #3ea8c5; /* Sky Teal */
+  --color-accent: #27ae7a; /* Mint Green */
+  --color-alert: #f4a732; /* Amber */
+
+  /* 🌊 Background System */
+  --color-bg-main: #f5f9fc; /* Cloud White */
+  --color-bg-card: #ebf4fa; /* Ice Blue */
+  --color-bg-soft: #e0f4ee; /* Mint Mist */
+  --color-bg-warn: #fff7e8; /* Soft Amber */
+
+  /* 🖤 Text Colors */
+  --color-text-primary: #1e2b38; /* Deep Navy */
+  --color-text-secondary: #4f6578; /* Slate */
+  --color-text-muted: #8da5b8; /* Steel */
+
+  /* ⚪ Borders & UI */
+  --color-border: #d6e8f2; /* Fog Blue */
+  --color-divider: #e5e5e5; /* Pale Gray */
+
+  /* ✅ Status Colors */
+  --color-success-bg: #e8f7f1;
+  --color-success: #27ae7a;
+  --color-warning-bg: #fff3cd;
+  --color-warning: #f4a732;
+  --color-error-bg: #fdecea;
+  --color-error: #d94f3d;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-bg-main text-text-primary;
+}
