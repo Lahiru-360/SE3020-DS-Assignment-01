@@ -4,6 +4,7 @@ import {
   handleWebhookService,
   getMyTransactionsService,
   refundPaymentService,
+  verifyPaymentService,
 } from '../services/paymentService.js';
 import { sendSuccess, sendError } from '../utils/responseHelper.js';
 
@@ -76,6 +77,26 @@ export const getMyTransactions = async (req, res, next) => {
 
     const transactions = await getMyTransactionsService(patientId);
     return sendSuccess(res, transactions, 'Transactions fetched');
+  } catch (e) {
+    next(e);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/payments/verify/:intentId
+// Patient manually triggers a server-side verify with Stripe (for local dev sync).
+// ─────────────────────────────────────────────────────────────────────────────
+export const verifyPayment = async (req, res, next) => {
+  try {
+    const patientId = req.headers['x-user-id'];
+    if (!patientId) return sendError(res, 'Unauthorized', 401);
+
+    const { intentId } = req.params;
+    if (!intentId) return sendError(res, 'Missing intentId', 400);
+
+    const result = await verifyPaymentService({ paymentIntentId: intentId, patientId });
+
+    return sendSuccess(res, result, result.success ? 'Payment verified' : 'Payment status checked');
   } catch (e) {
     next(e);
   }

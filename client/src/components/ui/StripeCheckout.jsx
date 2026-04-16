@@ -6,12 +6,9 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
-import { createPayment } from "../../api/paymentService";
+import { createPayment, verifyPayment } from "../../api/paymentService";
 import Loader from "./Loader";
 import Alert from "./Alert";
-
-// ── Stripe instance — initialised once at module level ────────────────────
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // ── Stripe Elements appearance ────────────────────────────────────────────
 const APPEARANCE = {
@@ -32,6 +29,7 @@ function CheckoutForm({ amount, currency, onSuccess, onCancel }) {
   const stripe = useStripe();
   const elements = useElements();
   const [paying, setPaying] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState("");
 
   const fmtAmount = `${currency ?? "LKR"} ${Number(amount ?? 0).toLocaleString("en-LK")}`;
@@ -53,10 +51,27 @@ function CheckoutForm({ amount, currency, onSuccess, onCancel }) {
       });
 
       if (stripeError) {
+        console.error("[StripeCheckout] Stripe Error:", stripeError);
+        alert(`Stripe Error: ${stripeError.message} (${stripeError.code})`);
         setError(stripeError.message || "Payment failed. Please try again.");
         setPaying(false);
-      } else if (paymentIntent?.status === "succeeded") {
-        onSuccess();
+        return;
+      }
+
+      if (paymentIntent?.status === "succeeded") {
+        setPaying(false);
+        setVerifying(true);
+        console.log("[StripeCheckout] Payment succeeded on Stripe. Syncing with backend...");
+
+        try {
+          await verifyPayment(paymentIntent.id);
+          console.log("[StripeCheckout] Backend synchronization complete.");
+          onSuccess();
+        } catch (syncErr) {
+          console.error("[StripeCheckout] Verification failed:", syncErr);
+          setError("Payment succeeded, but we couldn't update your dashboard status. Please refresh the page manually.");
+          setVerifying(false);
+        }
       } else {
         setError("Payment is processing or failed. Check your bank statement.");
         setPaying(false);
@@ -77,17 +92,17 @@ function CheckoutForm({ amount, currency, onSuccess, onCancel }) {
         <button
           type="button"
           onClick={onCancel}
-          disabled={paying}
+          disabled={paying || verifying}
           className="flex-1 py-2.5 rounded-lg border border-border text-text-secondary text-sm font-semibold hover:text-text-primary hover:border-primary transition-colors disabled:opacity-50"
         >
           Cancel
         </button>
         <button
           type="submit"
-          disabled={!stripe || !elements || paying}
+          disabled={!stripe || !elements || paying || verifying}
           className="flex-[2] py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {paying ? "Processing..." : `Pay ${fmtAmount}`}
+          {paying ? "Processing Payment..." : verifying ? "Syncing Dashboard..." : `Pay ${fmtAmount}`}
         </button>
       </div>
 
@@ -100,6 +115,16 @@ function CheckoutForm({ amount, currency, onSuccess, onCancel }) {
 
 // ── StripeCheckout (Export) ───────────────────────────────────────────────
 export default function StripeCheckout({ appointment, onSuccess, onCancel }) {
+  // Move stripePromise inside to ensure it gets the key from import.meta.env at runtime
+  const stripePromise = useMemo(() => {
+    const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+    if (!key) {
+      console.error("[StripeCheckout] VITE_STRIPE_PUBLISHABLE_KEY is missing!");
+      return null;
+    }
+    return loadStripe(key);
+  }, []);
+
   const [clientSecret, setClientSecret] = useState(null);
   const [txInfo, setTxInfo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -113,6 +138,7 @@ export default function StripeCheckout({ appointment, onSuccess, onCancel }) {
     createPayment(appointment._id)
       .then((res) => {
         const data = res.data?.data;
+        console.log("[StripeCheckout] Received Client Secret:", data?.clientSecret?.substring(0, 20) + "...");
         setClientSecret(data.clientSecret);
         setTxInfo(data);
       })
@@ -123,6 +149,10 @@ export default function StripeCheckout({ appointment, onSuccess, onCancel }) {
   }, [appointment._id]);
 
   const options = useMemo(() => ({ clientSecret, appearance: APPEARANCE }), [clientSecret]);
+
+  if (!stripePromise) {
+    return <Alert type="error" message="Stripe configuration missing. Check client/.env" />;
+  }
 
   if (loading) return <div className="py-6"><Loader /></div>;
   if (error) return <div className="space-y-3"><Alert type="error" message={error} /><button onClick={onCancel} className="text-sm text-text-muted hover:text-primary">← Go back</button></div>;

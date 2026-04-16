@@ -57,6 +57,74 @@ async function updateAppointmentPayment(appointmentId, updates) {
 // 1. CREATE PAYMENT INTENT
 //    Called by patient via: POST /api/payments/create-intent
 //
+// ─── Shared Payment Success Logic (Idempotent) ─────────────────────────────
+async function processPaymentSuccess(paymentIntentId, stripeObject) {
+  const transaction = await findTransactionByStripeIntentId(paymentIntentId);
+  if (!transaction) {
+    console.warn(`[PaymentService] ProcessSuccess: no transaction for intent ${paymentIntentId}`);
+    return;
+  }
+
+  // Idempotency check: Don't process if already completed
+  if (transaction.status === "completed") {
+    console.log(`[PaymentService] Transaction ${transaction._id} already completed — skipping`);
+    return;
+  }
+
+  const chargeId = stripeObject.latest_charge;
+  let cardDetails = {};
+  if (chargeId) {
+    try {
+      const charge = await stripe.charges.retrieve(chargeId);
+      const card = charge.payment_method_details?.card;
+      cardDetails = {
+        cardLast4: card?.last4 ?? null,
+        cardBrand: card?.brand ?? null,
+        cardExpMonth: card?.exp_month ?? null,
+        cardExpYear: card?.exp_year ?? null,
+        cardCountry: card?.country ?? null,
+      };
+    } catch (err) {
+      console.warn("[PaymentService] Could not retrieve charge details:", err.message);
+    }
+  }
+
+  await updateTransactionById(transaction._id, {
+    status: "completed",
+    stripeChargeId: chargeId || null,
+    ...cardDetails,
+    webhookReceivedAt: transaction.webhookReceivedAt || new Date(),
+    updatedAt: new Date(),
+  });
+
+  publishPaymentEvent("payment_succeeded", { appointmentId: transaction.appointmentId });
+  console.log(`[PaymentService] Payment processed for appointment ${transaction.appointmentId}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. VERIFY PAYMENT (Secure source-of-truth verify for local dev)
+// ─────────────────────────────────────────────────────────────────────────────
+export const verifyPaymentService = async ({ paymentIntentId, patientId }) => {
+  const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+  // Security Check: Ensure the intent belongs to the requesting patient
+  if (intent.metadata.patientId !== patientId) {
+    console.warn(`[PaymentService] Verify: Ownership mismatch! Intent ${paymentIntentId} belongs to ${intent.metadata.patientId}, but was requested by ${patientId}`);
+    throw createHttpError("Forbidden: You do not own this payment", 403);
+  }
+
+  if (intent.status === "succeeded") {
+    await processPaymentSuccess(paymentIntentId, intent);
+    return { success: true, status: "completed" };
+  }
+
+  return { success: false, status: intent.status };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. CREATE PAYMENT INTENT
+//    Called by patient via: POST /api/payments/create-intent
+//
 //    Flow:
 //      a. Fetch appointment, validate ownership
 //      b. Guard against double-payment
@@ -88,10 +156,18 @@ export const createPaymentIntentService = async ({
   }
 
   // b. Guard against double-payment initiation (idempotency)
-  // [DISABLED TEMPORARILY] to force fresh intent with new 'card' config
+  // [FORCE DISABLED] to resolve 400 Bad Request loop for test sessions
   /*
   const existing = await findTransactionByAppointmentId(appointmentId);
-  ...
+  if (existing && existing.status === "initiated") {
+    const intent = await stripe.paymentIntents.retrieve(existing.stripePaymentIntentId);
+    return {
+      clientSecret: intent.client_secret,
+      transactionId: existing._id,
+      amount: existing.amount,
+      currency: existing.currency,
+    };
+  }
   */
 
   // c. Create Stripe PaymentIntent
@@ -110,7 +186,7 @@ export const createPaymentIntentService = async ({
   const paymentIntent = await stripe.paymentIntents.create({
     amount: Math.round(Number(fee) * 100), // convert to smallest unit (cents)
     currency: (appointment.currency || "LKR").toLowerCase(),
-    payment_method_types: ["card"], // Explicitly force card to avoid 400 errors
+    payment_method_types: ["card"],
     metadata: {
       appointmentId: appointmentId.toString(),
       patientId: patientId.toString(),
@@ -192,73 +268,22 @@ export const handleWebhookService = async (rawBody, stripeSignature) => {
     return { received: true };
   }
 
-  // ── Success path ────────────────────────────────────────────────────────────
   if (event.type === "payment_intent.succeeded") {
-    // Extract PCI-safe card metadata from the latest charge
-    const chargeId = stripeObject.latest_charge;
-    let cardLast4 = null;
-    let cardBrand = null;
-    let cardExpMonth = null;
-    let cardExpYear = null;
-    let cardCountry = null;
-
-    if (chargeId) {
-      try {
-        const charge = await stripe.charges.retrieve(chargeId);
-        const cardDetails = charge.payment_method_details?.card;
-        cardLast4 = cardDetails?.last4 ?? null;
-        cardBrand = cardDetails?.brand ?? null;
-        cardExpMonth = cardDetails?.exp_month ?? null;
-        cardExpYear = cardDetails?.exp_year ?? null;
-        cardCountry = cardDetails?.country ?? null;
-      } catch (err) {
-        console.warn(
-          "[PaymentService] Could not retrieve charge details:",
-          err.message,
-        );
-      }
-    }
-
-    // Update transaction to completed with full card metadata
-    await updateTransactionById(transaction._id, {
-      status: "completed",
-      stripeChargeId: chargeId || null,
-      cardLast4,
-      cardBrand,
-      cardExpMonth,
-      cardExpYear,
-      cardCountry,
-      webhookReceivedAt: new Date(),
-    });
-
-    // Notify appointment-service via event — it will mark paymentStatus: paid and status: confirmed
-    publishPaymentEvent("payment_succeeded", {
-      appointmentId: transaction.appointmentId,
-    });
-
-    console.log(
-      `[PaymentService] Payment completed for appointment ${transaction.appointmentId}`,
-    );
+    await processPaymentSuccess(paymentIntentId, stripeObject);
   }
 
-  // ── Failure path ────────────────────────────────────────────────────────────
   if (event.type === "payment_intent.payment_failed") {
-    const failureReason =
-      stripeObject.last_payment_error?.message || "Payment failed";
-
-    await updateTransactionById(transaction._id, {
-      status: "failed",
-      failureReason,
-      webhookReceivedAt: new Date(),
-    });
-
-    publishPaymentEvent("payment_failed", {
-      appointmentId: transaction.appointmentId,
-    });
-
-    console.warn(
-      `[PaymentService] Payment failed for appointment ${transaction.appointmentId}: ${failureReason}`,
-    );
+    const transaction = await findTransactionByStripeIntentId(paymentIntentId);
+    if (transaction && transaction.status !== "failed") {
+      const failureReason = stripeObject.last_payment_error?.message || "Payment failed";
+      await updateTransactionById(transaction._id, {
+        status: "failed",
+        failureReason,
+        webhookReceivedAt: new Date(),
+        updatedAt: new Date(),
+      });
+      publishPaymentEvent("payment_failed", { appointmentId: transaction.appointmentId });
+    }
   }
 
   // ── Refund path (e.g. triggered from Stripe Dashboard) ──────────────────────
