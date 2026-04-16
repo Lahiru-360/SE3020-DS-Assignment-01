@@ -17,8 +17,6 @@ import {
 } from "../utils/tokenHelper.js";
 import { createHttpError } from "../utils/httpError.js";
 
-// ─── Private helpers ───────────────────────────────────────────────────────
-
 const buildTokenPayload = (user) => ({
   userId: user._id.toString(),
   email: user.email,
@@ -84,11 +82,8 @@ const registerUser = async (
   user.refId = refId;
   await saveUser(user);
 
-  // No tokens issued on registration — the client redirects to the login page.
   return { user: buildUserResponse(user) };
 };
-
-// ─── Public service functions ──────────────────────────────────────────────
 
 export const registerPatientService = (fields) =>
   registerUser(
@@ -108,7 +103,6 @@ export const registerDoctorService = (fields) =>
 
 export const loginService = async ({ email, password }) => {
   const user = await findUserByEmail(email);
-  // Deliberate: same message for "not found" and "wrong password" — avoids user enumeration.
   if (!user) throw createHttpError("Invalid credentials", 401);
 
   if (!user.isActive) {
@@ -145,12 +139,8 @@ export const refreshTokenService = (token) => {
 };
 
 export const logoutService = () => {
-  // Token is stateless — the client must discard it from storage.
-  // Token blacklisting via Redis can be added in a future iteration.
   return null;
 };
-
-// ─── Admin service functions ───────────────────────────────────────────────
 
 export const getPendingDoctorsService = async () => {
   const { data } = await axios.get(
@@ -187,6 +177,9 @@ export const rejectDoctorService = async (userId) => {
   if (!user || user.role !== "doctor")
     throw createHttpError("Doctor user not found", 404);
 
+  if (user.isActive)
+    throw createHttpError("Cannot reject an already-approved doctor", 409);
+
   try {
     await axios.delete(
       `${process.env.DOCTOR_SERVICE_URL}/api/doctors/internal/${userId}`,
@@ -202,8 +195,6 @@ export const rejectDoctorService = async (userId) => {
   await deleteUserById(userId);
 };
 
-// ─── Admin user-management service functions ───────────────────────────────
-
 export const getAllUsersService = async ({
   role,
   isActive,
@@ -215,7 +206,6 @@ export const getAllUsersService = async ({
   if (role) filter.role = role;
   if (isActive !== undefined && isActive !== "")
     filter.isActive = isActive === "true" || isActive === true;
-  // Sanitise the search string before using it in a regex
   if (email)
     filter.email = {
       $regex: email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
@@ -277,7 +267,6 @@ export const deleteUserService = async (userId, requestingAdminId) => {
   if (user.role === "admin")
     throw createHttpError("Cannot delete an admin account", 403);
 
-  // Best-effort cascade: remove the downstream profile (non-fatal if it fails)
   if (user.role === "patient") {
     try {
       await axios.delete(

@@ -7,10 +7,19 @@ import cors from 'cors';
 import morgan from 'morgan';
 
 import { connectDB } from './config/db.js';
+import { connectRabbitMQ } from './config/rabbitmq.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { startAppointmentCancelledConsumer } from './events/appointmentCancelledConsumer.js';
 
 connectDB();
+
+// Connect to RabbitMQ and start the appointment cancelled consumer.
+// connectRabbitMQ retries indefinitely — the callback runs each time a fresh
+// connection is established, including after mid-runtime reconnects.
+connectRabbitMQ(async () => {
+  await startAppointmentCancelledConsumer();
+});
 
 const app = express();
 

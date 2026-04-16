@@ -7,10 +7,21 @@ import cors from 'cors';
 import morgan from 'morgan';
 
 import { connectDB } from './config/db.js';
+import { connectRabbitMQ } from './config/rabbitmq.js';
 import appointmentRoutes from './routes/appointmentRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { startSessionConsumer } from './events/sessionConsumer.js';
+import { startPaymentConsumer } from './events/paymentConsumer.js';
 
 connectDB();
+
+// Connect to RabbitMQ and start consumers.
+// connectRabbitMQ retries indefinitely — the callback runs each time a fresh
+// connection is established, including after mid-runtime reconnects.
+connectRabbitMQ(async () => {
+  await startSessionConsumer();
+  await startPaymentConsumer();
+});
 
 const app = express();
 

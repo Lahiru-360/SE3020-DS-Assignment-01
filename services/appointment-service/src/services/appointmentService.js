@@ -10,6 +10,7 @@ import {
   findActiveBookingForSlot,
 } from '../repositories/appointmentRepository.js';
 import { createHttpError } from '../utils/httpError.js';
+import { publishAppointmentEvent } from '../events/appointmentPublisher.js';
 
 // ─── Allowed status transitions ────────────────────────────────────────────
 const STATUS_TRANSITIONS = {
@@ -183,20 +184,8 @@ export const cancelAppointmentService = async (appointmentId, userId, role) => {
 
   if (appt.paymentStatus === 'paid') {
     const deleted = await deleteAppointmentById(appointmentId);
-    try {
-      await axios.post(
-        `${process.env.PAYMENT_SERVICE_URL}/api/payments/internal/refund/${appointmentId}`,
-        {},
-        { headers: internalHeaders() }
-      );
-    } catch (err) {
-      console.error('[AppointmentService] Refund failed', {
-        appointmentId,
-        paymentId: appt.paymentId,
-        error: err.message,
-      });
-      // do NOT throw — cancel still succeeds
-    }
+    // Publish appointment.cancelled — payment-service consumes this event
+    // and triggers the Stripe refund automatically via RabbitMQ.
     notifyBoth('appointment_cancelled', appt).catch((err) =>
       console.warn('[AppointmentService] notifyBoth error (cancelled):', err.message)
     );
@@ -312,36 +301,17 @@ async function notifyBoth(type, appt) {
   for (const recipient of recipients) {
     // Skip entirely if we have no address to deliver to
     if (!recipient.email) continue;
-
-    // Use 'both' only when a valid phone number is available; otherwise 'email'.
-    // This prevents the notification-service validator from rejecting the request
-    // when recipientPhone is absent.
-    const channel = recipient.phone ? 'both' : 'email';
-
-    const payload = {
+    // Publish one message per recipient to RabbitMQ.
+    // The notification-service consumer picks these up and handles email + SMS.
+    publishAppointmentEvent(type, {
       type,
-      channel,
+      channel: recipient.phone ? 'both' : 'email',
       recipientEmail: recipient.email,
       recipientName:  recipient.name,
+      recipientPhone: recipient.phone ?? null,
+      source:         'appointment-service',
       metadata,
-    };
-    // Only include recipientPhone in the payload when it exists
-    if (recipient.phone) payload.recipientPhone = recipient.phone;
-
-    try {
-      await axios.post(
-        `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/send`,
-        payload,
-        { headers: internalHeaders() }
-      );
-    } catch (err) {
-      // Log per-recipient failures so they are visible in service logs,
-      // but continue sending to the remaining recipients.
-      console.error(
-        `[AppointmentService] Notification (${type}) failed for ${recipient.email}:`,
-        err.response?.data ?? err.message
-      );
-    }
+    });
   }
 }
 

@@ -1,7 +1,3 @@
-// ─────────────────────────────────────────────────────
-// Availability Service Routes — API Gateway
-// ─────────────────────────────────────────────────────
-
 import { Router } from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { config } from "../config/index.js";
@@ -25,8 +21,6 @@ const availabilityProxy = createProxyMiddleware({
   },
 });
 
-// Since Patients need to READ availability but only Doctors can EDIT them,
-// We attach the JWT verifier to make sure someone is logged in:
 router.use("/api/availability", verifyToken);
 
 // Only doctors can POST, PUT, DELETE
