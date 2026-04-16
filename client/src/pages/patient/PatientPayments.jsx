@@ -88,8 +88,8 @@ function PayModal({ appointments, onClose, onSuccess, initialId }) {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-md mx-4 rounded-xl border border-border bg-bg-card shadow-xl p-6 space-y-5">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 md:pt-20 pb-10 overflow-y-auto bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-md mx-4 rounded-xl border border-border bg-bg-card shadow-xl p-6 space-y-5 relative my-auto">
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-base font-semibold text-text-primary">
