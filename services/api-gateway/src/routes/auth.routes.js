@@ -2,8 +2,12 @@ import { Router } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { config } from '../config/index.js';
 import { verifyToken, requireRole } from '../middleware/authMiddleware.js';
+import { authRateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
+
+// Tighter rate limit on auth paths (login, register, password reset).
+router.use('/api/auth', authRateLimiter);
 
 // Guard admin paths — runs before the proxy, restores full URL on next().
 router.use('/api/auth/admin', verifyToken, requireRole('admin'));

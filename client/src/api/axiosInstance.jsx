@@ -37,6 +37,19 @@ axiosInstance.interceptors.response.use(
     const url = error.config?.url ?? "";
     const isAuthEndpoint = AUTH_ENDPOINTS.some((path) => url.includes(path));
 
+  
+    const isNetworkDrop = !error.response && (
+      error.code === "ERR_NETWORK" ||
+      error.code === "ERR_EMPTY_RESPONSE" ||
+      error.message === "Network Error"
+    );
+    if (isNetworkDrop && !error.config._retried) {
+      error.config._retried = true;
+      return new Promise((resolve) =>
+        setTimeout(() => resolve(axiosInstance(error.config)), 1500),
+      );
+    }
+
     if (error.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem("hc_token");
       localStorage.removeItem("hc_refresh_token");
