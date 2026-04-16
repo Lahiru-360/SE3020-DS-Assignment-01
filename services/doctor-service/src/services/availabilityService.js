@@ -3,6 +3,7 @@ import {
   findAvailabilityByDoctorAndDate,
   findAvailabilitiesByDoctor,
   updateAvailability,
+  deleteAvailabilityByDoctorAndDate,
 } from "../repositories/availabilityRepository.js";
 import { createHttpError } from "../utils/httpError.js";
 
@@ -77,23 +78,42 @@ export const addAvailabilityService = async (doctorId, date, slots) => {
   }
 
   // Check if availability for this date already exists for the doctor
-  const existingAvailability = await findAvailabilityByDoctorAndDate(
+  let existingAvailability = await findAvailabilityByDoctorAndDate(
     doctorId,
     date,
   );
 
-  if (existingAvailability) {
-    // Optionally update instead of throwing an error:
-    // But throwing an error gives better explicit feedback
-    throw createHttpError(
-      "Availability already exists. Consider updating it instead.",
-      409,
-    );
+  // If a stale empty document exists (legacy data or a race condition),
+  // remove it so we can create a fresh one below.
+  if (existingAvailability && existingAvailability.timeslots.length === 0) {
+    await deleteAvailabilityByDoctorAndDate(doctorId, date);
+    existingAvailability = null;
   }
 
-  // Validation Rule 1: Max 2 slots
+  if (existingAvailability) {
+    // Phase-conflict check: reject only if a requested phase already exists.
+    for (const slot of slots) {
+      if (existingAvailability.timeslots.some((s) => s.phase === slot.phase)) {
+        throw createHttpError(
+          `${slot.phase} slot already exists. Use the edit endpoint to update it.`,
+          409,
+        );
+      }
+    }
+    // Enforce the overall 2-slot cap across the merged set.
+    if (existingAvailability.timeslots.length + slots.length > 2) {
+      throw createHttpError("Maximum 2 slots allowed per date", 400);
+    }
+  }
+
+  // Validation Rule 1: Max 2 slots per request
   if (!slots || slots.length > 2) {
     throw createHttpError("Maximum 2 slots allowed", 400);
+  }
+
+  // Rule 4: No duplicate phases within this request
+  if (slots.length === 2 && slots[0].phase === slots[1].phase) {
+    throw createHttpError("Same phase cannot have multiple blocks", 400);
   }
 
   const timeslots = [];
@@ -127,9 +147,11 @@ export const addAvailabilityService = async (doctorId, date, slots) => {
     });
   }
 
-  // Rule 4: No overlap between blocks - same phases check
-  if (slots.length === 2 && slots[0].phase === slots[1].phase) {
-    throw createHttpError("Same phase cannot have multiple blocks", 400);
+  // If a partial availability document already exists, append new slots to it.
+  if (existingAvailability) {
+    existingAvailability.timeslots.push(...timeslots);
+    await existingAvailability.save();
+    return existingAvailability;
   }
 
   const newAvailability = await createAvailability({
@@ -271,6 +293,13 @@ export const deleteAvailabilityTimeslotService = async (
 
   // Remove slot
   availabilityDoc.timeslots.splice(slotIndex, 1);
+
+  // If no slots remain, delete the document entirely to prevent it from
+  // blocking future POST requests with a spurious 409 conflict.
+  if (availabilityDoc.timeslots.length === 0) {
+    await deleteAvailabilityByDoctorAndDate(doctorId, date);
+    return null;
+  }
 
   // Save changes
   await availabilityDoc.save();

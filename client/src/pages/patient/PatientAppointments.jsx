@@ -80,18 +80,12 @@ function PaymentStatusBadge({ status }) {
 
 /** Whether the appointment is eligible for payment */
 function canPayAppointment(appt) {
-  return (
-    appt.status === "confirmed" &&
-    appt.paymentStatus === "unpaid"
-  );
+  return appt.status === "confirmed" && appt.paymentStatus === "unpaid";
 }
 
 /** Whether the appointment allows retrying a failed payment */
 function canRetryPayment(appt) {
-  return (
-    appt.status === "confirmed" &&
-    appt.paymentStatus === "failed"
-  );
+  return appt.status === "confirmed" && appt.paymentStatus === "failed";
 }
 
 // ── CloseButton ────────────────────────────────────────────────────────────
@@ -564,7 +558,10 @@ function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
             <p className="text-xs text-text-secondary mt-0.5 font-medium">
               Dr. {appt.doctorName ?? appt.doctorId}
               {appt.doctorSpecialization && (
-                <span className="font-normal text-text-muted"> · {appt.doctorSpecialization}</span>
+                <span className="font-normal text-text-muted">
+                  {" "}
+                  · {appt.doctorSpecialization}
+                </span>
               )}
             </p>
           )}

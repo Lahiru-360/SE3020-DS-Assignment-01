@@ -147,6 +147,39 @@ function PhaseSection({ phase, indexes, onChange }) {
   );
 }
 
+// ── Existing-phase read-only display ──────────────────────────────────────
+// Shows a phase that is already saved so the doctor knows it's occupied.
+
+function ExistingPhaseDisplay({ phase, slot }) {
+  return (
+    <div className="rounded-lg bg-bg-main border border-border p-3 opacity-80">
+      <div className="flex items-center gap-2 mb-2">
+        <span
+          className={[
+            "text-xs font-semibold uppercase tracking-wide",
+            phase === "morning" ? "text-primary" : "text-accent",
+          ].join(" ")}
+        >
+          {phase}
+        </span>
+        <span className="text-xs text-text-muted">
+          {phase === "morning" ? "06:00–12:00" : "12:00–22:00"}
+        </span>
+        <span className="ml-auto text-xs font-semibold text-success">
+          Already set
+        </span>
+      </div>
+      <span className="inline-block rounded-full px-3 py-1 text-xs font-medium bg-success-bg text-success">
+        {slot.startTime}–{slot.endTime}
+      </span>
+      <p className="mt-1.5 text-xs text-text-muted">
+        Use the <span className="font-medium">Edit</span> button to change this
+        slot.
+      </p>
+    </div>
+  );
+}
+
 // ── Add / Edit modal ───────────────────────────────────────────────────────
 
 function AvailabilityModal({
@@ -154,6 +187,7 @@ function AvailabilityModal({
   initialDate,
   initialPhase, // only used in edit mode
   initialIndexes, // only used in edit mode
+  existingDocs, // full availability array, used in add mode to detect occupied phases
   onSave,
   onClose,
   saving,
@@ -172,6 +206,24 @@ function AvailabilityModal({
     isEdit && initialPhase === "evening" ? (initialIndexes ?? []) : [],
   );
 
+  // Reset selection when doctor changes the date in add mode.
+  useEffect(() => {
+    if (!isEdit) {
+      setMorningIndexes([]);
+      setEveningIndexes([]);
+    }
+  }, [date, isEdit]);
+
+  // ── Existing-phase detection (add mode only) ──────────────────
+  const existingDoc = !isEdit
+    ? (existingDocs?.find((d) => d.date === date) ?? null)
+    : null;
+  const existingMorning =
+    existingDoc?.timeslots.find((s) => s.phase === "morning") ?? null;
+  const existingEvening =
+    existingDoc?.timeslots.find((s) => s.phase === "evening") ?? null;
+  const bothPhasesExist = !isEdit && existingMorning && existingEvening;
+
   // ── Derived ────────────────────────────────────────────────────
 
   // A phase is valid when it has at least one slot AND all selected slots are consecutive.
@@ -179,14 +231,17 @@ function AvailabilityModal({
     idxs.length === 0 || idxs.length === 1 || areConsecutive(idxs);
 
   // Edit: only the locked phase must be non-empty and consecutive.
-  // Add: at least one phase must be filled, and every filled phase must be consecutive.
+  // Add: at least one NEW phase must be filled, and every filled phase must be
+  // consecutive. Phases already set on this date cannot be added again.
   const canSave = isEdit
     ? (() => {
         const idxs =
           initialPhase === "morning" ? morningIndexes : eveningIndexes;
         return idxs.length > 0 && isValidPhase(idxs);
       })()
-    : (morningIndexes.length > 0 || eveningIndexes.length > 0) &&
+    : !bothPhasesExist &&
+      ((!existingMorning && morningIndexes.length > 0) ||
+        (!existingEvening && eveningIndexes.length > 0)) &&
       isValidPhase(morningIndexes) &&
       isValidPhase(eveningIndexes);
 
@@ -196,11 +251,11 @@ function AvailabilityModal({
         initialPhase === "morning" ? morningIndexes : eveningIndexes;
       onSave({ date, phase: initialPhase, indexes });
     } else {
-      // Build slots array from whichever phases the doctor filled in.
+      // Only include phases that are not already saved for this date.
       const slots = [];
-      if (morningIndexes.length)
+      if (!existingMorning && morningIndexes.length)
         slots.push({ phase: "morning", indexes: morningIndexes });
-      if (eveningIndexes.length)
+      if (!existingEvening && eveningIndexes.length)
         slots.push({ phase: "evening", indexes: eveningIndexes });
       onSave({ date, slots });
     }
@@ -273,19 +328,34 @@ function AvailabilityModal({
             </p>
           </div>
 
-          {/* ── Add mode: show both phases simultaneously ────── */}
+          {/* ── Add mode: show both phases, respecting existing slots ─── */}
           {!isEdit && (
             <>
-              <PhaseSection
-                phase="morning"
-                indexes={morningIndexes}
-                onChange={setMorningIndexes}
-              />
-              <PhaseSection
-                phase="evening"
-                indexes={eveningIndexes}
-                onChange={setEveningIndexes}
-              />
+              {existingMorning ? (
+                <ExistingPhaseDisplay phase="morning" slot={existingMorning} />
+              ) : (
+                <PhaseSection
+                  phase="morning"
+                  indexes={morningIndexes}
+                  onChange={setMorningIndexes}
+                />
+              )}
+              {existingEvening ? (
+                <ExistingPhaseDisplay phase="evening" slot={existingEvening} />
+              ) : (
+                <PhaseSection
+                  phase="evening"
+                  indexes={eveningIndexes}
+                  onChange={setEveningIndexes}
+                />
+              )}
+              {bothPhasesExist && (
+                <p className="text-xs text-text-muted text-center">
+                  Both slots are already set for this date. Select a different
+                  date or use <span className="font-medium">Edit</span> to
+                  modify existing slots.
+                </p>
+              )}
             </>
           )}
 
@@ -569,6 +639,7 @@ export default function DoctorAvailability() {
           initialDate={modal.date}
           initialPhase={modal.phase}
           initialIndexes={modal.indexes}
+          existingDocs={availability}
           onSave={handleSave}
           onClose={closeModal}
           saving={saving}
