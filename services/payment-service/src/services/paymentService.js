@@ -88,21 +88,11 @@ export const createPaymentIntentService = async ({
   }
 
   // b. Guard against double-payment initiation (idempotency)
-  //    If a transaction already exists and is 'initiated', return the same clientSecret.
+  // [DISABLED TEMPORARILY] to force fresh intent with new 'card' config
+  /*
   const existing = await findTransactionByAppointmentId(appointmentId);
-  if (existing && existing.status === "initiated") {
-    // Retrieve the fresh clientSecret from Stripe (in case it expired, we'd need
-    // to create a new one, but for sandbox this is fine)
-    const intent = await stripe.paymentIntents.retrieve(
-      existing.stripePaymentIntentId,
-    );
-    return {
-      clientSecret: intent.client_secret,
-      transactionId: existing._id,
-      amount: existing.amount,
-      currency: existing.currency,
-    };
-  }
+  ...
+  */
 
   // c. Create Stripe PaymentIntent
   //    amount is in smallest currency unit — LKR is a 2-decimal currency in Stripe
@@ -115,9 +105,12 @@ export const createPaymentIntentService = async ({
     );
   }
 
+  console.log(`[PaymentService] Creating PaymentIntent for appointment ${appointmentId}, amount: ${fee} LKR`);
+
   const paymentIntent = await stripe.paymentIntents.create({
     amount: Math.round(Number(fee) * 100), // convert to smallest unit (cents)
     currency: (appointment.currency || "LKR").toLowerCase(),
+    payment_method_types: ["card"], // Explicitly force card to avoid 400 errors
     metadata: {
       appointmentId: appointmentId.toString(),
       patientId: patientId.toString(),
