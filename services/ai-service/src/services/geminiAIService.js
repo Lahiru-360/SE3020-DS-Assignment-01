@@ -4,11 +4,11 @@ import { config } from '../config/index.js';
 export const analyzeSymptoms = async (symptoms) => {
   // Use user-provided model first, then stable fallbacks
   const modelsToTry = [
-    config.GEMINI_MODEL,
-    'gemini-3-flash-preview',
-    'gemini-2.5-flash',
-    'gemini-flash-lite-latest',
-    'gemini-flash-latest'
+    config.GEMINI_MODEL || 'gemini-2.5-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash',
+    'gemini-pro',
+    'gemini-1.0-pro'
   ];
   let lastError = null;
 
