@@ -35,6 +35,10 @@
   color-scheme: light;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   @apply bg-bg-main text-text-primary;
 }

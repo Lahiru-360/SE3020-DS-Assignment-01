@@ -8,8 +8,17 @@ export default function Header() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <img src={Logo} alt="Sunny Logo" className="h-15 w-auto" />
+            <a href="/">
+              <img src={Logo} alt="CareLink Logo" className="h-15 w-auto" />
+            </a>
           </div>
+
+          {/* Navigation - Hidden on mobile, visible on desktop */}
+          <nav className="hidden md:flex items-center gap-8">
+            <a href="/#features" className="text-sm font-semibold text-text-secondary hover:text-primary transition-colors">Features</a>
+            <a href="/#how-it-works" className="text-sm font-semibold text-text-secondary hover:text-primary transition-colors">How it works</a>
+            <a href="/#contact" className="text-sm font-semibold text-text-secondary hover:text-primary transition-colors">Contact us</a>
+          </nav>
 
           {/* Actions */}
           <div className="flex items-center gap-4">
