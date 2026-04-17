@@ -33,7 +33,7 @@ data:
   SLOT_DURATION_MINUTES: "20"
 
   # ai-service
-  GEMINI_MODEL: "gemini-2.0-flash"
+  GEMINI_MODEL:    "gemini-2.5-flash"
   GEMINI_BASE_URL: "https://generativelanguage.googleapis.com/v1beta/models"
 
   # RabbitMQ

@@ -82,12 +82,18 @@ function PaymentStatusBadge({ status }) {
 
 /** Whether the appointment is eligible for payment */
 function canPayAppointment(appt) {
-  return appt.status === "confirmed" && appt.paymentStatus === "unpaid";
+  return (
+    (appt.status === "confirmed" || appt.status === "pending") &&
+    appt.paymentStatus === "unpaid"
+  );
 }
 
 /** Whether the appointment allows retrying a failed payment */
 function canRetryPayment(appt) {
-  return appt.status === "confirmed" && appt.paymentStatus === "failed";
+  return (
+    (appt.status === "confirmed" || appt.status === "pending") &&
+    appt.paymentStatus === "failed"
+  );
 }
 
 // ── CloseButton ────────────────────────────────────────────────────────────
@@ -525,9 +531,15 @@ function AppointmentDetailModal({
 // ── AppointmentCard ────────────────────────────────────────────────────────
 
 function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
+  const navigate = useNavigate();
   const canCancel = appt.status === "pending" || appt.status === "confirmed";
   const showPay = canPayAppointment(appt) || canRetryPayment(appt);
   const [cardTeleError, setCardTeleError] = useState("");
+
+  const handlePayClick = (e) => {
+    e.stopPropagation();
+    navigate(`/patient/payments?pay=${appt._id}`);
+  };
 
   return (
     <div
@@ -585,10 +597,10 @@ function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
         {showPay && (
           <button
             type="button"
-            onClick={() => onSelect(appt)}
+            onClick={handlePayClick}
             className="px-4 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors"
           >
-            {canRetryPayment(appt) ? "Retry Payment" : "Pay Now"}
+            {canRetryPayment(appt) ? "Retry Payment" : "Pay"}
           </button>
         )}
         {canCancel && (

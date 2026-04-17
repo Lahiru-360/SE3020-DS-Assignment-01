@@ -14,6 +14,7 @@ import {
   createPaymentIntent,
   handleWebhook,
   getMyTransactions,
+  verifyPayment,
   refundPayment,
   refundPaymentInternal,
 } from '../controllers/paymentController.js';
@@ -27,6 +28,7 @@ router.post('/webhook', handleWebhook);
 
 // Patient-facing routes (JWT verified + role enforced at Gateway level)
 router.post('/create-intent', createPaymentIntentValidators, createPaymentIntent);
+router.post('/verify/:intentId', verifyPayment);
 router.get('/my', getMyTransactions);
 
 // Refund routes
