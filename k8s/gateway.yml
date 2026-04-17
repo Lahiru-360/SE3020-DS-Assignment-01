@@ -1,0 +1,63 @@
+# API Gateway
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: healthcare
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: hc-api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: hc-config          # Injects all *_SERVICE_URL values
+          env:
+            - name: PORT
+              value: "5000"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hc-secrets
+                  key: JWT_SECRET
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+
+---
+
+# API Gateway NodePort Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: healthcare
+spec:
+  type: NodePort
+  selector:
+    app: api-gateway
+  ports:
+    - port: 5000        # Cluster-internal port
+      targetPort: 5000  # Container port
+      nodePort: 30500   # External port (range 30000–32767)

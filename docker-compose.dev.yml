@@ -1,0 +1,67 @@
+# Development override — use with:
+#   docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# Changes from base compose:
+#   - All backend services run with nodemon (hot-reload on file save)
+#   - Client runs Vite dev server instead of nginx (HMR on file save)
+#   - CHOKIDAR_USEPOLLING / WATCHPACK_POLLING enabled for Windows host FS events
+
+services:
+
+  auth-service:
+    command: npm run dev
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+
+  patient-service:
+    command: npm run dev
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+
+  doctor-service:
+    command: npm run dev
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+
+  appointment-service:
+    command: npm run dev
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+
+  notification-service:
+    command: npm run dev
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+
+  telemedicine-service:
+    command: npm run dev
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+
+  payment-service:
+    command: npm run dev
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+
+  ai-service:
+    command: npm run dev
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+
+  api-gateway:
+    command: npm run dev
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - NODE_ENV=development
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:5000/api

@@ -1,0 +1,211 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: hc-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: hcadmin
+      RABBITMQ_DEFAULT_PASS: hcpassword
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - hc-network
+
+  mongo:
+    image: mongo:7
+    container_name: hc-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - hc-network
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: hc-auth-service
+    restart: unless-stopped
+    env_file:
+      - ./services/auth-service/.env
+    depends_on:
+      - mongo
+      - patient-service
+      - doctor-service
+    volumes:
+      - ./services/auth-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+
+  patient-service:
+    build:
+      context: ./services/patient-service
+      dockerfile: Dockerfile
+    container_name: hc-patient-service
+    restart: unless-stopped
+    env_file:
+      - ./services/patient-service/.env
+    depends_on:
+      - mongo
+    volumes:
+      - ./services/patient-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+
+  doctor-service:
+    build:
+      context: ./services/doctor-service
+      dockerfile: Dockerfile
+    container_name: hc-doctor-service
+    restart: unless-stopped
+    env_file:
+      - ./services/doctor-service/.env
+    depends_on:
+      - mongo
+    volumes:
+      - ./services/doctor-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+
+  appointment-service:
+    build:
+      context: ./services/appointment-service
+      dockerfile: Dockerfile
+    container_name: hc-appointment-service
+    restart: unless-stopped
+    env_file:
+      - ./services/appointment-service/.env
+    depends_on:
+      - mongo
+      - doctor-service
+      - patient-service
+      - notification-service
+      - rabbitmq
+    volumes:
+      - ./services/appointment-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: hc-notification-service
+    restart: unless-stopped
+    env_file:
+      - ./services/notification-service/.env
+    depends_on:
+      - mongo
+      - rabbitmq
+    volumes:
+      - ./services/notification-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+
+  telemedicine-service:
+    build:
+      context: ./services/telemedicine-service
+      dockerfile: Dockerfile
+    container_name: hc-telemedicine-service
+    restart: unless-stopped
+    env_file:
+      - ./services/telemedicine-service/.env
+    depends_on:
+      - mongo
+      - appointment-service
+      - rabbitmq
+    volumes:
+      - ./services/telemedicine-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: hc-payment-service
+    restart: unless-stopped
+    env_file:
+      - ./services/payment-service/.env
+    depends_on:
+      - mongo
+      - rabbitmq
+      - appointment-service
+    volumes:
+      - ./services/payment-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: hc-ai-service
+    restart: unless-stopped
+    env_file:
+      - ./services/ai-service/.env
+    depends_on:
+      - mongo
+      - doctor-service
+    volumes:
+      - ./services/ai-service:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: hc-api-gateway
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./services/api-gateway/.env
+    depends_on:
+      - auth-service
+      - patient-service
+      - doctor-service
+      - appointment-service
+      - notification-service
+      - telemedicine-service
+      - payment-service
+      - ai-service
+    volumes:
+      - ./services/api-gateway:/app
+      - /app/node_modules
+    networks:
+      - hc-network
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: hc-client
+    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=http://localhost:5000/api
+
+
+volumes:
+  mongo_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+
+networks:
+  hc-network:
+    driver: bridge
