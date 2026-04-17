@@ -704,34 +704,42 @@ export default function PatientAppointments() {
   // Opens the confirmation dialog instead of cancelling immediately
   const requestCancel = (id) => setConfirmCancelId(id);
 
-  // ── Doctor search handler ─────────────────────────────────────────────
+  // ── Doctor search ─────────────────────────────────────────────────────────
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  const loadDoctors = useCallback(async ({ name = "", spec = "" } = {}) => {
     setSearchError("");
-    setHasSearched(true);
     setSearchLoading(true);
     try {
       const res = await searchDoctors({
-        name: searchName.trim() || undefined,
-        specialization: searchSpec.trim() || undefined,
+        name: name.trim() || undefined,
+        specialization: spec.trim() || undefined,
       });
       setDoctors(res.data?.data ?? []);
+      setHasSearched(true);
     } catch (err) {
       setSearchError(
-        err.response?.data?.message ?? "Failed to search doctors.",
+        err.response?.data?.message ?? "Failed to load doctors.",
       );
     } finally {
       setSearchLoading(false);
     }
+  }, []);
+
+  // Auto-load all doctors when the tab is first opened
+  useEffect(() => {
+    if (tab === "doctors" && !hasSearched) {
+      loadDoctors();
+    }
+  }, [tab, hasSearched, loadDoctors]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    loadDoctors({ name: searchName, spec: searchSpec });
   };
 
   // ── Derived ──────────────────────────────────────────────────────────
 
-  // Hide unpaid appointments that are no longer actionable:
-  //   • Past date  — slot is gone, nothing to pay or cancel
-  //   • Today but time slot already elapsed — same reason
-  // Future/upcoming unpaid appointments are kept so the patient can still pay.
+  // Hide expired unpaid appointments (past dates or elapsed today slots)
   const today = todayInTZ();
   const visibleAppointments = appointments.filter((a) => {
     if (a.paymentStatus !== "unpaid") return true;
@@ -900,6 +908,13 @@ export default function PatientAppointments() {
           {searchLoading ? (
             <div className="py-10">
               <Loader />
+            </div>
+          ) : !hasSearched ? (
+            <div className="rounded-xl border border-border bg-bg-card px-6 py-10 text-center">
+              <p className="text-sm font-semibold text-text-primary mb-1">Find a Doctor</p>
+              <p className="text-sm text-text-muted">
+                Enter a doctor&rsquo;s name or specialization above and press Search.
+              </p>
             </div>
           ) : hasSearched && doctors.length === 0 ? (
             <div className="rounded-xl border border-border bg-bg-card px-6 py-10 text-center">
