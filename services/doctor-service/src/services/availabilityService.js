@@ -4,6 +4,8 @@ import {
   findAvailabilitiesByDoctor,
   updateAvailability,
   deleteAvailabilityByDoctorAndDate,
+  markPhaseAsBooked,
+  unmarkPhaseAsBooked,
 } from "../repositories/availabilityRepository.js";
 import { createHttpError } from "../utils/httpError.js";
 
@@ -305,4 +307,20 @@ export const deleteAvailabilityTimeslotService = async (
   await availabilityDoc.save();
 
   return availabilityDoc;
+};
+
+export const markSlotBookedService = async (doctorId, date, phase) => {
+  const result = await markPhaseAsBooked(doctorId, date, phase);
+  if (!result) {
+    throw createHttpError("Availability slot not found", 404);
+  }
+  return result;
+};
+
+export const unmarkSlotBookedService = async (doctorId, date, phase) => {
+  const result = await unmarkPhaseAsBooked(doctorId, date, phase);
+  if (!result) {
+    throw createHttpError("Availability slot not found", 404);
+  }
+  return result;
 };

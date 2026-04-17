@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import {
@@ -8,6 +8,11 @@ import {
   getPatientPrescriptions,
   downloadPrescriptionPdf,
 } from "../../api/patientService";
+import {
+  uploadRecord,
+  getMyRecords,
+  getRecordSignedUrl,
+} from "../../api/recordService";
 import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 import StatusBadge from "../../components/ui/StatusBadge";
@@ -88,7 +93,7 @@ function canRetryPayment(appt) {
   return appt.status === "confirmed" && appt.paymentStatus === "failed";
 }
 
-// ── CloseButton ────────────────────────────────────────────────────────────
+//  CloseButton 
 
 function CloseButton({ onClick }) {
   return (
@@ -153,7 +158,7 @@ function DoctorCard({ doctor, onSelect }) {
   );
 }
 
-// ── PrescriptionView ───────────────────────────────────────────────────────
+//  PrescriptionView 
 // Read-only display of a prescription inside the appointment detail modal.
 
 function PrescriptionView({ prescription, onDownload, pdfLoading }) {
@@ -221,7 +226,7 @@ function PrescriptionView({ prescription, onDownload, pdfLoading }) {
   );
 }
 
-// ── AppointmentDetailModal ─────────────────────────────────────────────────
+//  AppointmentDetailModal 
 // Shows full appointment info, cancel option, and prescription (if completed).
 // Manages its own prescription fetch.
 
@@ -234,6 +239,7 @@ function AppointmentDetailModal({
   onPaymentSuccess,
 }) {
   const isCompleted = appt.status === "completed";
+  const isConfirmed = appt.status === "confirmed";
   const isVirtualConfirmed =
     appt.type === "VIRTUAL" && appt.status === "confirmed";
 
@@ -251,6 +257,15 @@ function AppointmentDetailModal({
   // Telemedicine state
   const [teleError, setTeleError] = useState("");
 
+  // Medical records state
+  const [records, setRecords] = useState(null);
+  const [recordsLoading, setRecordsLoading] = useState(isConfirmed);
+  const [recordsError, setRecordsError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [uploadSuccess, setUploadSuccess] = useState("");
+  const fileInputRef = useRef(null);
+
   const showPayBtn =
     !paymentDone && (canPayAppointment(appt) || canRetryPayment(appt));
 
@@ -266,6 +281,15 @@ function AppointmentDetailModal({
       .catch(() => setPrescError("Failed to load prescription."))
       .finally(() => setPrescLoading(false));
   }, [isCompleted, userId, appt._id]);
+
+  // Fetch medical records on mount (confirmed appointments only)
+  useEffect(() => {
+    if (!isConfirmed) return;
+    getMyRecords()
+      .then((res) => setRecords(res.data?.data ?? []))
+      .catch(() => setRecordsError("Failed to load medical records."))
+      .finally(() => setRecordsLoading(false));
+  }, [isConfirmed]);
 
   const handleDownloadPdf = async () => {
     if (!prescription || prescription === "none") return;
@@ -286,6 +310,51 @@ function AppointmentDetailModal({
       setPdfError("Failed to download PDF. Please try again.");
     } finally {
       setPdfLoading(false);
+    }
+  };
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      setUploadError("Only PDF files are allowed.");
+      e.target.value = "";
+      return;
+    }
+    setUploading(true);
+    setUploadError("");
+    setUploadSuccess("");
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await uploadRecord(formData);
+      setRecords((prev) => [res.data?.data, ...(prev ?? [])]);
+      setUploadSuccess("Record uploaded successfully.");
+    } catch (err) {
+      setUploadError(
+        err.response?.data?.message ?? "Upload failed. Please try again.",
+      );
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleDownloadRecord = async (reportId, fileName) => {
+    setRecordsError("");
+    try {
+      const res = await getRecordSignedUrl(reportId);
+      const url = res.data?.data?.url;
+      if (!url) throw new Error("No URL returned");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      setRecordsError("Failed to download record. Please try again.");
     }
   };
 
@@ -510,6 +579,83 @@ function AppointmentDetailModal({
                   <p className="text-sm text-text-muted">
                     No prescription has been issued for this appointment yet.
                   </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Medical Records section — confirmed appointments, patient only */}
+          {isConfirmed && (
+            <div className="border-t border-border pt-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-semibold text-text-primary">
+                  Medical Records
+                </p>
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                >
+                  {uploading ? "Uploading…" : "+ Upload PDF"}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+              </div>
+
+              {uploadError && <Alert type="error">{uploadError}</Alert>}
+              {uploadSuccess && <Alert type="success">{uploadSuccess}</Alert>}
+              {recordsError && <Alert type="error">{recordsError}</Alert>}
+
+              {recordsLoading ? (
+                <div className="py-6">
+                  <Loader />
+                </div>
+              ) : records?.length === 0 ? (
+                <div className="rounded-lg bg-bg-main border border-border px-4 py-6 text-center">
+                  <p className="text-sm text-text-muted">
+                    No medical records uploaded yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {records?.map((r) => (
+                    <div
+                      key={r._id}
+                      className="rounded-lg bg-bg-main border border-border px-4 py-3 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-text-primary truncate">
+                          {r.fileName}
+                        </p>
+                        {r.description && (
+                          <p className="text-xs text-text-muted truncate">
+                            {r.description}
+                          </p>
+                        )}
+                        <p className="text-xs text-text-muted mt-0.5">
+                          {new Date(r.createdAt).toLocaleDateString("en-US", {
+                            dateStyle: "medium",
+                          })}
+                          {r.fileSize
+                            ? ` · ${(r.fileSize / 1024).toFixed(0)} KB`
+                            : ""}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadRecord(r._id, r.fileName)}
+                        className="shrink-0 px-3 py-1.5 rounded-lg border border-primary text-primary text-xs font-semibold hover:bg-bg-card transition-colors"
+                      >
+                        Download
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

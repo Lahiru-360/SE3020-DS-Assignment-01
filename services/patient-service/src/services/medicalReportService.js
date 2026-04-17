@@ -1,23 +1,27 @@
-import { randomUUID } from 'crypto';
-import path from 'path';
-import { supabase } from '../config/supabase.js';
+import { randomUUID } from "crypto";
+import path from "path";
+import { supabase } from "../config/supabase.js";
 import {
   createReport,
   findReportsByPatientId,
   findReportById,
   deleteReportById,
-} from '../repositories/medicalReportRepository.js';
-import { createHttpError } from '../utils/httpError.js';
+} from "../repositories/medicalReportRepository.js";
+import { createHttpError } from "../utils/httpError.js";
 
-const BUCKET = 'medical-reports';
+const BUCKET = "medical-reports";
 
 // Signed URLs expire after 1 hour
 const SIGNED_URL_EXPIRY_SECONDS = 3600;
 
 //  Upload
 
-export const uploadMedicalReportService = async ({ file, patientId, description }) => {
-  const ext         = path.extname(file.originalname).toLowerCase();
+export const uploadMedicalReportService = async ({
+  file,
+  patientId,
+  description,
+}) => {
+  const ext = path.extname(file.originalname).toLowerCase();
   const storagePath = `${patientId}/${randomUUID()}${ext}`;
 
   const { error: uploadError } = await supabase.storage
@@ -33,10 +37,10 @@ export const uploadMedicalReportService = async ({ file, patientId, description 
 
   const report = await createReport({
     patientId,
-    filePath:    storagePath,
-    fileName:    file.originalname,
-    fileType:    file.mimetype,
-    fileSize:    file.size,
+    filePath: storagePath,
+    fileName: file.originalname,
+    fileType: file.mimetype,
+    fileSize: file.size,
     description: description?.trim() || null,
   });
 
@@ -53,15 +57,18 @@ export const listMedicalReportsService = async (patientId) => {
 
 export const getSignedUrlService = async (patientId, reportId) => {
   const report = await findReportById(reportId);
-  if (!report)                    throw createHttpError('Report not found', 404);
-  if (report.patientId !== patientId) throw createHttpError('Forbidden', 403);
+  if (!report) throw createHttpError("Report not found", 404);
+  if (report.patientId !== patientId) throw createHttpError("Forbidden", 403);
 
   const { data, error } = await supabase.storage
     .from(BUCKET)
     .createSignedUrl(report.filePath, SIGNED_URL_EXPIRY_SECONDS);
 
   if (error) {
-    throw createHttpError(`Could not generate signed URL: ${error.message}`, 502);
+    throw createHttpError(
+      `Could not generate signed URL: ${error.message}`,
+      502,
+    );
   }
 
   return { url: data.signedUrl, expiresIn: SIGNED_URL_EXPIRY_SECONDS };
@@ -71,15 +78,18 @@ export const getSignedUrlService = async (patientId, reportId) => {
 
 export const deleteMedicalReportService = async (patientId, reportId) => {
   const report = await findReportById(reportId);
-  if (!report)                    throw createHttpError('Report not found', 404);
-  if (report.patientId !== patientId) throw createHttpError('Forbidden', 403);
+  if (!report) throw createHttpError("Report not found", 404);
+  if (report.patientId !== patientId) throw createHttpError("Forbidden", 403);
 
   const { error: storageError } = await supabase.storage
     .from(BUCKET)
     .remove([report.filePath]);
 
   if (storageError) {
-    throw createHttpError(`Storage deletion failed: ${storageError.message}`, 502);
+    throw createHttpError(
+      `Storage deletion failed: ${storageError.message}`,
+      502,
+    );
   }
 
   await deleteReportById(reportId);

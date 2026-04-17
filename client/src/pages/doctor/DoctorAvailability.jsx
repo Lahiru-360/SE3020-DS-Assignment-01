@@ -517,6 +517,7 @@ export default function DoctorAvailability() {
 
             const isDeletingThis =
               deleting?.date === avail.date && deleting?.phase === phase;
+            const isSlotBooked = slots.some((s) => s.isBooked);
 
             return (
               <div
@@ -538,15 +539,16 @@ export default function DoctorAvailability() {
                       onClick={() =>
                         openEdit(avail.date, phase, avail.timeslots)
                       }
-                      className="text-xs font-medium text-primary hover:underline"
+                      disabled={isSlotBooked || !!deleting}
+                      className="text-xs font-medium text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(avail.date, phase)}
-                      disabled={!!deleting}
-                      className="text-xs font-medium text-error hover:underline disabled:opacity-50"
+                      disabled={isSlotBooked || !!deleting}
+                      className="text-xs font-medium text-error hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
                     >
                       {isDeletingThis ? "Removing…" : "Remove"}
                     </button>

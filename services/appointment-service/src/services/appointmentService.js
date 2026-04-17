@@ -151,6 +151,20 @@ export const bookAppointmentService = async ({
     currency: currency || doctor.currency || "LKR",
   });
 
+  // 9b. Mark the availability timeslot as booked (fire-and-forget)
+  axios
+    .patch(
+      `${process.env.DOCTOR_SERVICE_URL}/api/availability/internal/${doctorId}/${dateStr}/slots/${phase}/mark-booked`,
+      {},
+      { headers: internalHeaders() },
+    )
+    .catch((err) =>
+      console.warn(
+        "[AppointmentService] Failed to mark slot as booked:",
+        err.message,
+      ),
+    );
+
   // 10. Fire-and-forget notifications to both parties
   notifyBoth("appointment_booked", appointment).catch((err) =>
     console.warn(
@@ -217,6 +231,8 @@ export const cancelAppointmentService = async (appointmentId, userId, role) => {
     throw createHttpError(`Cannot cancel a ${appt.status} appointment`, 400);
   }
 
+  const dateStr = appt.date.toISOString().slice(0, 10);
+
   if (appt.paymentStatus === "paid") {
     const deleted = await deleteAppointmentById(appointmentId);
     // Publish appointment.cancelled — payment-service consumes this event
@@ -227,6 +243,7 @@ export const cancelAppointmentService = async (appointmentId, userId, role) => {
         err.message,
       ),
     );
+    tryUnmarkPhaseSlot(appt.doctorId, dateStr, appt.timeSlot);
     return deleted;
   }
 
@@ -240,6 +257,7 @@ export const cancelAppointmentService = async (appointmentId, userId, role) => {
       err.message,
     ),
   );
+  tryUnmarkPhaseSlot(appt.doctorId, dateStr, appt.timeSlot);
 
   return updated;
 };
@@ -277,6 +295,11 @@ export const updateAppointmentStatusService = async (
       err.message,
     ),
   );
+
+  if (newStatus === "cancelled" || newStatus === "completed") {
+    const dateStr = appt.date.toISOString().slice(0, 10);
+    tryUnmarkPhaseSlot(appt.doctorId, dateStr, appt.timeSlot);
+  }
 
   return updated;
 };
@@ -390,6 +413,33 @@ function generateSubSlots(startTime, endTime) {
     slots.push(`${h}:${m}`);
   }
   return slots;
+}
+
+// ─── Helper: release isBooked lock after a cancellation/completion ─────────
+// Derives the phase from timeSlot, checks whether any other pending/confirmed
+// appointment still occupies that phase, and calls unmark-booked if none do.
+async function tryUnmarkPhaseSlot(doctorId, dateStr, timeSlot) {
+  try {
+    const hour = parseInt(timeSlot.split(":")[0], 10);
+    const phase = hour < 12 ? "morning" : "evening";
+    const remaining = await findActiveBookingsForDoctorOnDate(
+      doctorId,
+      dateStr,
+    );
+    const phaseStillActive = remaining.some((b) => {
+      const h = parseInt(b.timeSlot.split(":")[0], 10);
+      return (h < 12 ? "morning" : "evening") === phase;
+    });
+    if (!phaseStillActive) {
+      await axios.patch(
+        `${process.env.DOCTOR_SERVICE_URL}/api/availability/internal/${doctorId}/${dateStr}/slots/${phase}/unmark-booked`,
+        {},
+        { headers: internalHeaders() },
+      );
+    }
+  } catch (err) {
+    console.warn("[AppointmentService] Failed to unmark slot:", err.message);
+  }
 }
 
 // ─── Helper: fetch availability document for a doctor on a specific date ───
