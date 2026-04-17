@@ -37,11 +37,10 @@ function formatShortDate(dateStr) {
 }
 
 // Status filters
-const FILTERS = ["all", "pending", "confirmed", "completed", "cancelled"];
+const FILTERS = ["all", "confirmed", "completed", "cancelled"];
 
 const FILTER_LABELS = {
   all: "All",
-  pending: "Pending",
   confirmed: "Confirmed",
   completed: "Completed",
   cancelled: "Cancelled",

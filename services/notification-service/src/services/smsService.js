@@ -46,8 +46,8 @@ export const sendSms = async ({ type, recipientPhone, recipientName, message: me
   }
 
   const message = await twilioClient.messages.create({
-    to:                  recipientPhone,
-    messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+    to:   recipientPhone,
+    from: process.env.TWILIO_FROM_NUMBER,
     body,
   });
 
