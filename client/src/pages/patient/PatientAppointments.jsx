@@ -767,13 +767,24 @@ export default function PatientAppointments() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-xl font-semibold text-text-primary">
-          Appointments
-        </h1>
-        <p className="text-sm text-text-muted mt-0.5">
-          Manage your appointments or find a doctor to book a new one.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-text-primary">
+            Appointments
+          </h1>
+          <p className="text-sm text-text-muted mt-0.5">
+            Manage your appointments or find a doctor to book a new one.
+          </p>
+        </div>
+        {tab === "appointments" && (
+          <button
+            type="button"
+            onClick={() => setTab("doctors")}
+            className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap hidden sm:block"
+          >
+            + Book an Appointment
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -837,14 +848,14 @@ export default function PatientAppointments() {
               <Loader />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="rounded-xl border border-border bg-bg-card px-6 py-12 text-center">
-              <p className="text-sm text-text-muted">
+            <div className="rounded-xl border border-border bg-bg-card px-6 py-12 flex flex-col items-center justify-center space-y-4">
+              <p className="text-sm text-text-muted text-center max-w-sm">
                 No {filter === "all" ? "" : filter + " "}appointments found.
               </p>
               <button
                 type="button"
                 onClick={() => setTab("doctors")}
-                className="mt-4 px-5 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+                className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity"
               >
                 Find a Doctor
               </button>
