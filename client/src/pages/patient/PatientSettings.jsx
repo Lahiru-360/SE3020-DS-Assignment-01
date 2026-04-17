@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/useAuth";
-import { getPatientProfile, updatePatientProfile } from "../../api/patientService";
+import {
+  getPatientProfile,
+  updatePatientProfile,
+} from "../../api/patientService";
 import FormInput from "../../components/ui/FormInput";
 import Alert from "../../components/ui/Alert";
 import Loader from "../../components/ui/Loader";
-
-// ── Constants ──────────────────────────────────────────────────────────────
 
 const INITIAL_FORM = {
   firstName: "",
@@ -13,7 +14,7 @@ const INITIAL_FORM = {
   phone: "",
 };
 
-// ── Component ──────────────────────────────────────────────────────────────
+//  Component
 
 export default function PatientSettings() {
   const { userEmail } = useAuth();
@@ -25,7 +26,7 @@ export default function PatientSettings() {
   const [success, setSuccess] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // ── Load profile on mount ────────────────────────────────────────────────
+  //  Load profile on mount
 
   useEffect(() => {
     setLoading(true);
@@ -44,7 +45,7 @@ export default function PatientSettings() {
       .finally(() => setLoading(false));
   }, []);
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  //  Handlers
 
   const handleChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -53,7 +54,7 @@ export default function PatientSettings() {
     }
   };
 
-  // ── Validation ─────────────────────────────────────────────────────────
+  //  Validation
 
   const validate = () => {
     const errs = {};
@@ -81,7 +82,7 @@ export default function PatientSettings() {
     return errs;
   };
 
-  // ── Submit ─────────────────────────────────────────────────────────────
+  //  Submit
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -121,8 +122,6 @@ export default function PatientSettings() {
       setSaving(false);
     }
   };
-
-  // ── Render ─────────────────────────────────────────────────────────────
 
   if (loading) {
     return (

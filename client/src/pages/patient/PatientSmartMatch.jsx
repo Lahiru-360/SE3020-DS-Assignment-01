@@ -10,8 +10,6 @@ import {
 import { analyzeSymptoms } from "../../api/aiService";
 import Alert from "../../components/ui/Alert";
 
-// ── Urgency config ─────────────────────────────────────────────────────────
-
 const URGENCY_CFG = {
   emergency: {
     bg: "rgba(231,76,60,0.10)",
@@ -51,7 +49,7 @@ function UrgencyBadge({ urgency }) {
   );
 }
 
-// ── Doctor card ─────────────────────────────────────────────────────────────
+//  Doctor card
 
 function DoctorCard({ doctor, onBook }) {
   const fullName =
@@ -91,7 +89,7 @@ function DoctorCard({ doctor, onBook }) {
   );
 }
 
-// ── Component ──────────────────────────────────────────────────────────────
+//  Component
 
 const MAX_CHARS = 2000;
 const MIN_CHARS = 10;

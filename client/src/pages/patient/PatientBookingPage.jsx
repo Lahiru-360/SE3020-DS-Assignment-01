@@ -17,7 +17,7 @@ import {
 import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 
-// ── Nav (mirrors Patient.jsx) ───────────────────────────────────────────────
+//  Nav
 
 const PATIENT_NAV = [
   {
@@ -46,8 +46,6 @@ const PATIENT_NAV = [
     icon: <Settings size={18} />,
   },
 ];
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 function formatSlotDate(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
@@ -80,7 +78,7 @@ function groupByDate(availability) {
   return grouped;
 }
 
-// ── Main page ──────────────────────────────────────────────────────────────
+//  Main page
 
 export default function PatientBookingPage() {
   const { doctorId } = useParams();
@@ -127,7 +125,7 @@ export default function PatientBookingPage() {
     .filter((d) => !isPastDate(d))
     .sort();
 
-  // Toggle slot selection — clicking the same slot deselects it
+  // clicking the same slot deselects it
   const handleSlotClick = (date, slot) => {
     if (slot.isBooked) return;
     const alreadySelected =
@@ -178,7 +176,7 @@ export default function PatientBookingPage() {
   return (
     <DashboardLayout navItems={PATIENT_NAV}>
       <div className="max-w-3xl mx-auto space-y-6">
-        {/* ── Page header ─────────────────────────────────────────────── */}
+        {/*  Page header  */}
         <div className="flex items-start gap-3">
           <button
             type="button"
@@ -202,7 +200,7 @@ export default function PatientBookingPage() {
           </div>
         </div>
 
-        {/* ── Doctor info banner ───────────────────────────────────────── */}
+        {/*  Doctor info banner  */}
         {doctor && (
           <div className="rounded-xl border border-border bg-bg-card px-5 py-4 flex items-center justify-between gap-4">
             <div>
@@ -226,7 +224,7 @@ export default function PatientBookingPage() {
           </div>
         )}
 
-        {/* ── Availability content ─────────────────────────────────────── */}
+        {/*  Availability content  */}
         {loading ? (
           <div className="py-20">
             <Loader />

@@ -6,8 +6,6 @@ import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 import StatusBadge from "../../components/ui/StatusBadge";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 function formatDate(dateStr) {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -17,7 +15,7 @@ function formatDate(dateStr) {
   });
 }
 
-// ── Stat card ──────────────────────────────────────────────────────────────
+//  Stat card
 
 function StatCard({ label, value, accent }) {
   return (
@@ -33,7 +31,7 @@ function StatCard({ label, value, accent }) {
   );
 }
 
-// ── Component ──────────────────────────────────────────────────────────────
+//  Component
 
 export default function PatientOverview() {
   const { userEmail } = useAuth();
@@ -52,7 +50,7 @@ export default function PatientOverview() {
       .finally(() => setLoading(false));
   }, []);
 
-  // ── Derived stats ──────────────────────────────────────────────────────
+  //  Derived stats
 
   const stats = {
     total: appointments.length,

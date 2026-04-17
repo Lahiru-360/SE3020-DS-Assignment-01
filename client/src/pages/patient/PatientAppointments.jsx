@@ -13,6 +13,7 @@ import {
   uploadRecord,
   getMyRecords,
   getRecordSignedUrl,
+  deleteRecord,
 } from "../../api/recordService";
 import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
@@ -21,8 +22,6 @@ import FormInput from "../../components/ui/FormInput";
 import StripeCheckout from "../../components/ui/StripeCheckout";
 import TelemedicineButton from "../../components/ui/TelemedicineButton";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 function formatDate(dateStr) {
   if (!dateStr) return "—";
@@ -39,7 +38,7 @@ function formatShortDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("en-US", { dateStyle: "medium" });
 }
 
-// ── PaymentStatusBadge ─────────────────────────────────────────────────────
+//  PaymentStatusBadge
 
 const PAYMENT_STATUS_STYLES = {
   unpaid: {
@@ -85,7 +84,7 @@ function PaymentStatusBadge({ status }) {
   );
 }
 
-/** Whether the appointment is eligible for payment */
+//Whether the appointment is eligible for payment
 function canPayAppointment(appt) {
   return (
     (appt.status === "confirmed" || appt.status === "pending") &&
@@ -93,7 +92,7 @@ function canPayAppointment(appt) {
   );
 }
 
-/** Whether the appointment allows retrying a failed payment */
+//Whether the appointment allows retrying a failed payment
 function canRetryPayment(appt) {
   return (
     (appt.status === "confirmed" || appt.status === "pending") &&
@@ -101,7 +100,7 @@ function canRetryPayment(appt) {
   );
 }
 
-//  CloseButton
+// CloseButton
 
 function CloseButton({ onClick }) {
   return (
@@ -129,8 +128,7 @@ function CloseButton({ onClick }) {
   );
 }
 
-// ── DoctorCard ─────────────────────────────────────────────────────────────
-// Displays a doctor from search results. Clicking opens the booking modal.
+//  DoctorCard
 
 function DoctorCard({ doctor, onSelect }) {
   return (
@@ -167,7 +165,6 @@ function DoctorCard({ doctor, onSelect }) {
 }
 
 //  PrescriptionView
-// Read-only display of a prescription inside the appointment detail modal.
 
 function PrescriptionView({ prescription, onDownload, pdfLoading }) {
   return (
@@ -235,8 +232,6 @@ function PrescriptionView({ prescription, onDownload, pdfLoading }) {
 }
 
 //  AppointmentDetailModal
-// Shows full appointment info, cancel option, and prescription (if completed).
-// Manages its own prescription fetch.
 
 function AppointmentDetailModal({
   appt,
@@ -272,6 +267,8 @@ function AppointmentDetailModal({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null); // {_id, fileName}
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef(null);
 
   const showPayBtn =
@@ -366,6 +363,24 @@ function AppointmentDetailModal({
     }
   };
 
+  const handleDeleteRecord = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setRecordsError("");
+    try {
+      await deleteRecord(deleteTarget._id);
+      setRecords((prev) => prev.filter((r) => r._id !== deleteTarget._id));
+    } catch (err) {
+      setRecordsError(
+        err.response?.data?.message ??
+          "Failed to delete record. Please try again.",
+      );
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
   const hasPrescription = prescription !== null && prescription !== "none";
   const canCancel = appt.status === "pending" || appt.status === "confirmed";
 
@@ -441,7 +456,7 @@ function AppointmentDetailModal({
             </p>
           </div>
 
-          {/* Virtual Consultation section — confirmed VIRTUAL appointments only */}
+          {/* Virtual Consultation section*/}
           {isVirtualConfirmed && (
             <div className="border-t border-border pt-5 space-y-3">
               <div className="flex items-center gap-2">
@@ -655,13 +670,43 @@ function AppointmentDetailModal({
                             : ""}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadRecord(r._id, r.fileName)}
-                        className="shrink-0 px-3 py-1.5 rounded-lg border border-primary text-primary text-xs font-semibold hover:bg-bg-card transition-colors"
-                      >
-                        Download
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleDownloadRecord(r._id, r.fileName)
+                          }
+                          className="px-3 py-1.5 rounded-lg border border-primary text-primary text-xs font-semibold hover:bg-bg-card transition-colors"
+                        >
+                          Download
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDeleteTarget({
+                              _id: r._id,
+                              fileName: r.fileName,
+                            })
+                          }
+                          className="p-1.5 rounded-lg border border-border text-error hover:bg-error/10 transition-colors"
+                          aria-label="Delete record"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -670,11 +715,24 @@ function AppointmentDetailModal({
           )}
         </div>
       </div>
+
+      {/* Delete medical record confirmation */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        icon="danger"
+        title="Delete Medical Record?"
+        message={`"${deleteTarget?.fileName}" will be permanently deleted and cannot be recovered.`}
+        confirmLabel="Delete"
+        cancelLabel="Keep It"
+        loading={deleting}
+        onConfirm={handleDeleteRecord}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
 
-// ── AppointmentCard ────────────────────────────────────────────────────────
+//  AppointmentCard
 
 function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
   const navigate = useNavigate();
@@ -779,7 +837,7 @@ function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
   );
 }
 
-// ── Constants ──────────────────────────────────────────────────────────────
+//  Constants
 
 const TABS = ["appointments", "doctors"];
 const APPT_FILTERS = ["all", "pending", "confirmed", "completed", "cancelled"];
@@ -791,15 +849,15 @@ const FILTER_LABELS = {
   cancelled: "Cancelled",
 };
 
-// ── Main page ──────────────────────────────────────────────────────────────
+//  Main page
 
 export default function PatientAppointments() {
   const { userId } = useAuth();
 
-  // ── Tab state ─────────────────────────────────────────────────────────
+  //  Tab state
   const [tab, setTab] = useState("appointments");
 
-  // ── Appointments state ────────────────────────────────────────────────
+  //  Appointments state
   const [appointments, setAppointments] = useState([]);
   const [apptLoading, setApptLoading] = useState(true);
   const [apptError, setApptError] = useState("");
@@ -810,7 +868,7 @@ export default function PatientAppointments() {
   // Pending-cancel confirmation — holds the appointment ID awaiting user OK
   const [confirmCancelId, setConfirmCancelId] = useState(null);
 
-  // ── Doctor search state ───────────────────────────────────────────────
+  //  Doctor search state
   const [searchName, setSearchName] = useState("");
   const [searchSpec, setSearchSpec] = useState("");
   const [doctors, setDoctors] = useState([]);
@@ -820,7 +878,7 @@ export default function PatientAppointments() {
 
   const navigate = useNavigate();
 
-  // ── Fetch appointments ────────────────────────────────────────────────
+  //  Fetch appointments
 
   const fetchAppointments = useCallback(() => {
     setApptLoading(true);
@@ -838,7 +896,7 @@ export default function PatientAppointments() {
     fetchAppointments();
   }, [fetchAppointments]);
 
-  // ── Cancel handler ────────────────────────────────────────────────────
+  //  Cancel handler
 
   const handleCancel = async (id) => {
     setCancelling(id);
@@ -862,7 +920,7 @@ export default function PatientAppointments() {
   // Opens the confirmation dialog instead of cancelling immediately
   const requestCancel = (id) => setConfirmCancelId(id);
 
-  // ── Doctor search ─────────────────────────────────────────────────────────
+  //  Doctor search
 
   const loadDoctors = useCallback(async ({ name = "", spec = "" } = {}) => {
     setSearchError("");
@@ -893,7 +951,7 @@ export default function PatientAppointments() {
     loadDoctors({ name: searchName, spec: searchSpec });
   };
 
-  // ── Derived ──────────────────────────────────────────────────────────
+  //  Derived state
 
   // Hide expired unpaid appointments (past dates or elapsed today slots)
   const today = todayInTZ();
@@ -918,7 +976,7 @@ export default function PatientAppointments() {
     return acc;
   }, {});
 
-  // ── Render ────────────────────────────────────────────────────────────
+  //  Render
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -962,7 +1020,7 @@ export default function PatientAppointments() {
         ))}
       </div>
 
-      {/* ── MY APPOINTMENTS TAB ──────────────────────────────────────── */}
+      {/*  MY APPOINTMENTS TAB  */}
       {tab === "appointments" && (
         <div className="space-y-5">
           {apptError && <Alert type="error">{apptError}</Alert>}
@@ -1032,7 +1090,7 @@ export default function PatientAppointments() {
         </div>
       )}
 
-      {/* ── FIND A DOCTOR TAB ────────────────────────────────────────── */}
+      {/*  FIND A DOCTOR TAB  */}
       {tab === "doctors" && (
         <div className="space-y-5">
           {searchError && <Alert type="error">{searchError}</Alert>}
