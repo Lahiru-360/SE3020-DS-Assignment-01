@@ -17,9 +17,14 @@ const INITIAL_FORM = {
 //  Component
 
 export default function PatientSettings() {
-  const { userEmail } = useAuth();
+  const { userId, userEmail } = useAuth();
 
   const [form, setForm] = useState(INITIAL_FORM);
+  const [savedProfile, setSavedProfile] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -33,14 +38,23 @@ export default function PatientSettings() {
     getPatientProfile()
       .then((res) => {
         const p = res.data?.data ?? {};
-        setForm({
+        const profile = {
           firstName: p.firstName ?? "",
           lastName: p.lastName ?? "",
           phone: p.phone ?? "",
-        });
+        };
+        setForm(profile);
+        setSavedProfile(profile);
       })
-      .catch(() => {
-        // Profile not found yet (new patient) — keep blank form
+      .catch((err) => {
+        const msg =
+          err?.response?.data?.message ?? err?.message ?? "Unknown error";
+        console.error(
+          "[PatientSettings] Failed to load profile:",
+          err?.response?.status,
+          msg,
+        );
+        setError(`Could not load your profile: ${msg}`);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -110,11 +124,13 @@ export default function PatientSettings() {
     try {
       const res = await updatePatientProfile(payload);
       const updated = res.data?.data ?? {};
-      setForm({
+      const next = {
         firstName: updated.firstName ?? form.firstName,
         lastName: updated.lastName ?? form.lastName,
         phone: updated.phone ?? form.phone,
-      });
+      };
+      setForm(next);
+      setSavedProfile(next);
       setSuccess("Profile updated successfully.");
     } catch (err) {
       setError(err.response?.data?.message ?? "Failed to update profile.");
@@ -132,24 +148,67 @@ export default function PatientSettings() {
   }
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
-      {/* Header */}
+    <div className="max-w-xl mx-auto space-y-6">
+      {/* ── Header ────────────────────────────────────────── */}
       <div>
         <h1 className="text-xl font-semibold text-text-primary">
-          Profile Settings
+          Profile & Settings
         </h1>
-        <p className="text-sm text-text-muted mt-0.5">{userEmail}</p>
+        <p className="text-sm text-text-muted mt-0.5">
+          Keep your profile up to date for the platform.
+        </p>
       </div>
 
-      <div className="rounded-xl border border-border bg-bg-card p-6">
-        <p className="text-xs text-text-muted mb-5">
-          Fill in only the fields you want to update. All fields are optional.
-        </p>
+      {/* ── Feedback ──────────────────────────────────────── */}
+      {error && <Alert type="error">{error}</Alert>}
+      {success && <Alert type="success">{success}</Alert>}
 
-        {error && <Alert type="error">{error}</Alert>}
-        {success && <Alert type="success">{success}</Alert>}
+      {/* ── Account info (read-only) ───────────────────────── */}
+      <div className="rounded-xl border border-border bg-bg-card p-5 space-y-3">
+        <h2 className="text-sm font-semibold text-text-primary">Account</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-xs text-text-muted mb-0.5">First Name</p>
+            <p className="text-sm text-text-primary">
+              {savedProfile.firstName || "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-text-muted mb-0.5">Last Name</p>
+            <p className="text-sm text-text-primary">
+              {savedProfile.lastName || "—"}
+            </p>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs text-text-muted mb-0.5">Phone</p>
+          <p className="text-sm text-text-primary">
+            {savedProfile.phone || "—"}
+          </p>
+        </div>
+        <div className="border-t border-border pt-3">
+          <p className="text-xs text-text-muted mb-0.5">Email</p>
+          <p className="text-sm text-text-primary">{userEmail ?? "—"}</p>
+        </div>
+        <div>
+          <p className="text-xs text-text-muted mb-0.5">User ID</p>
+          <p className="text-xs font-mono text-text-muted break-all">
+            {userId ?? "—"}
+          </p>
+        </div>
+      </div>
 
-        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+      {/* ── Profile form ──────────────────────────────────── */}
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="rounded-xl border border-border bg-bg-card p-5 space-y-5"
+      >
+        <h2 className="text-sm font-semibold text-text-primary">
+          Profile Information
+        </h2>
+
+        <div className="grid grid-cols-2 gap-4">
           <FormInput
             id="patient-firstName"
             label="First Name"
@@ -166,29 +225,26 @@ export default function PatientSettings() {
             placeholder="e.g. Perera"
             error={fieldErrors.lastName}
           />
-          <FormInput
-            id="patient-phone"
-            label="Phone Number"
-            type="tel"
-            value={form.phone}
-            onChange={(e) => {
-              const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
-              handleChange("phone")({ target: { value: digits } });
-            }}
-            placeholder="e.g. 0771234567"
-            error={fieldErrors.phone}
-            maxLength={10}
-          />
+        </div>
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
-          >
-            {saving ? "Saving…" : "Save Changes"}
-          </button>
-        </form>
-      </div>
+        <FormInput
+          id="patient-phone"
+          label="Phone Number"
+          type="tel"
+          value={form.phone}
+          onChange={handleChange("phone")}
+          placeholder="e.g. +94 77 123 4567"
+          error={fieldErrors.phone}
+        />
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+        >
+          {saving ? "Saving…" : "Save Changes"}
+        </button>
+      </form>
     </div>
   );
 }
