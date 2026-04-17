@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { todayInTZ, addDaysInTZ, isPastDate } from "../../utils/timezone";
 import { useAuth } from "../../context/useAuth";
 import {
   getDoctorAvailability,
@@ -45,15 +46,10 @@ function formatDate(dateStr) {
   });
 }
 
-// Generate YYYY-MM-DD for today + n days
-function addDays(n) {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return d.toISOString().split("T")[0];
-}
-
-const todayStr = () => new Date().toISOString().split("T")[0];
-const maxDateStr = () => addDays(7);
+// todayStr / maxDateStr use the app timezone (Asia/Colombo by default).
+// See src/utils/timezone.js — change VITE_TIMEZONE in client/.env to adjust.
+const todayStr = () => todayInTZ();
+const maxDateStr = () => addDaysInTZ(7);
 
 // Are the provided indexes a set of sequential consecutive integers?
 function areConsecutive(indexes) {
@@ -580,10 +576,13 @@ export default function DoctorAvailability() {
     );
   };
 
-  // Sort availability by date ascending
-  const sorted = [...availability].sort(
-    (a, b) => new Date(a.date) - new Date(b.date),
-  );
+  // Sort availability by date ascending and hide past dates.
+  // Past-date entries shouldn't normally exist (backend rejects them) but
+  // can linger if the server was running in a different timezone or from
+  // older data. Hiding them on the frontend prevents accidental edits.
+  const sorted = [...availability]
+    .filter((a) => !isPastDate(a.date))
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
