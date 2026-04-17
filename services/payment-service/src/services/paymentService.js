@@ -105,7 +105,16 @@ async function processPaymentSuccess(paymentIntentId, stripeObject) {
 // 1. VERIFY PAYMENT (Secure source-of-truth verify for local dev)
 // ─────────────────────────────────────────────────────────────────────────────
 export const verifyPaymentService = async ({ paymentIntentId, patientId }) => {
-  const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  let intent;
+  try {
+    intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  } catch (stripeErr) {
+
+    throw createHttpError(
+      `Could not retrieve payment from Stripe: ${stripeErr.message}`,
+      502,
+    );
+  }
 
   // Security Check: Ensure the intent belongs to the requesting patient
   if (intent.metadata.patientId !== patientId) {

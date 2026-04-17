@@ -66,12 +66,12 @@ function CheckoutForm({ amount, currency, onSuccess, onCancel }) {
         try {
           await verifyPayment(paymentIntent.id);
           console.log("[StripeCheckout] Backend synchronization complete.");
-          onSuccess();
         } catch (syncErr) {
-          console.error("[StripeCheckout] Verification failed:", syncErr);
-          setError("Payment succeeded, but we couldn't update your dashboard status. Please refresh the page manually.");
-          setVerifying(false);
+          
+          console.warn("[StripeCheckout] Backend sync failed (will retry via webhook):", syncErr?.response?.data?.message ?? syncErr.message);
         }
+
+        onSuccess();
       } else {
         setError("Payment is processing or failed. Check your bank statement.");
         setPaying(false);
