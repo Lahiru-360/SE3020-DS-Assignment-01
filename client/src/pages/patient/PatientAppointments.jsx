@@ -400,13 +400,7 @@ function AppointmentDetailModal({
 
         {/* Scrollable body */}
         <div className="overflow-y-auto px-6 py-5 space-y-5">
-          {/* Status */}
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-text-muted uppercase tracking-wide">
-              Status
-            </p>
-            <StatusBadge status={appt.status} />
-          </div>
+          {/* Status row hidden from patients */}
 
           {/* Core details */}
           <div className="grid grid-cols-2 gap-4">
@@ -785,7 +779,6 @@ function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
           )}
         </div>
         <div className="flex flex-col items-end gap-1.5 shrink-0">
-          <StatusBadge status={appt.status} />
           <PaymentStatusBadge status={appt.paymentStatus} />
         </div>
       </div>
