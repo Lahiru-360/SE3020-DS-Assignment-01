@@ -124,7 +124,7 @@ function Login() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
-              autoComplete="email"
+              autoComplete="off"
             />
 
             <FormInput
@@ -135,7 +135,7 @@ function Login() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              autoComplete="current-password"
+              autoComplete="new-password"
             />
 
             <button
