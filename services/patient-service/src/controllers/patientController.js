@@ -27,6 +27,22 @@ export const getPatientInternal = async (req, res, next) => {
   }
 };
 
+export const getOwnProfile = async (req, res, next) => {
+  try {
+    const userId = req.headers["x-user-id"];
+    const role = req.headers["x-user-role"];
+
+    if (!userId) return sendError(res, "Unauthorized", 401);
+    if (role !== "patient")
+      return sendError(res, "Forbidden: patients only", 403);
+
+    const patient = await getPatientByUserIdService(userId);
+    return sendSuccess(res, patient, "Patient profile retrieved", 200);
+  } catch (e) {
+    next(e);
+  }
+};
+
 export const updateProfile = async (req, res, next) => {
   try {
     const errors = validationResult(req);

@@ -84,8 +84,7 @@ function buildAppointmentHtml(type, { recipientName, patientName, doctorName, sp
 }
 
 // ─── Generic fallback HTML template ──────────────────────────────────────────
-// Used when the notification type has no built-in template (e.g. auth_otp, payment_confirmed).
-// Renders the caller-supplied `message` and any metadata key-value pairs.
+// Used for event types with no built-in template; renders caller-supplied message + metadata.
 function buildGenericHtml(subject, message, recipientName, metadata = {}) {
   const metaRows = Object.entries(metadata)
     .map(
@@ -146,8 +145,7 @@ function buildGenericHtml(subject, message, recipientName, metadata = {}) {
 }
 
 // ─── Send a single email ──────────────────────────────────────────────────────
-// Caller may supply `subject` and `message` to override built-in templates.
-// Falls back to the generic template when no built-in template matches the type.
+// Uses built-in appointment template if available, otherwise falls back to generic template.
 export const sendEmail = async ({ type, recipientEmail, recipientName, subject: subjectOverride, message: messageOverride, metadata }) => {
   const isBuiltIn = Boolean(BUILT_IN_SUBJECTS[type]);
 
@@ -157,10 +155,10 @@ export const sendEmail = async ({ type, recipientEmail, recipientName, subject: 
   // Resolve HTML body
   let html;
   if (isBuiltIn && !messageOverride) {
-    // Use the rich appointment-specific template
+    // Rich appointment template
     html = buildAppointmentHtml(type, { recipientName, ...metadata });
   } else {
-    // Use the generic template — with caller-supplied or auto-generated message
+    // Generic template — uses caller-supplied or auto-generated message
     const bodyText = messageOverride || `You have received a notification of type: ${type}.`;
     html = buildGenericHtml(subject, bodyText, recipientName, metadata);
   }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { isPastDate } from "../../utils/timezone";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import {
   HeartPulse,
@@ -110,7 +111,10 @@ export default function PatientBookingPage() {
   }, [doctorId]);
 
   const grouped = groupByDate(availability);
-  const sortedDates = Object.keys(grouped).sort();
+  // Hide past dates (timezone-aware) so patients can only book today or later.
+  const sortedDates = Object.keys(grouped)
+    .filter((d) => !isPastDate(d))
+    .sort();
 
   // Toggle slot selection — clicking the same slot deselects it
   const handleSlotClick = (date, slot) => {

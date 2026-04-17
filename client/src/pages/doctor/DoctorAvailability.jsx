@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { todayInTZ, addDaysInTZ, isPastDate } from "../../utils/timezone";
 import { useAuth } from "../../context/useAuth";
 import {
   getDoctorAvailability,
@@ -8,6 +9,7 @@ import {
 } from "../../api/doctorService";
 import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
 
 // ── Time constants (mirrors backend availabilityService.js) ───────────────
 
@@ -45,15 +47,10 @@ function formatDate(dateStr) {
   });
 }
 
-// Generate YYYY-MM-DD for today + n days
-function addDays(n) {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return d.toISOString().split("T")[0];
-}
-
-const todayStr = () => new Date().toISOString().split("T")[0];
-const maxDateStr = () => addDays(7);
+// todayStr / maxDateStr use the app timezone (Asia/Colombo by default).
+// See src/utils/timezone.js — change VITE_TIMEZONE in client/.env to adjust.
+const todayStr = () => todayInTZ();
+const maxDateStr = () => addDaysInTZ(7);
 
 // Are the provided indexes a set of sequential consecutive integers?
 function areConsecutive(indexes) {
@@ -413,8 +410,10 @@ export default function DoctorAvailability() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  // Delete confirmation
-  const [deleting, setDeleting] = useState(null); // null | {date, phase}
+  // Delete in-progress state: null | {date, phase}
+  const [deleting, setDeleting] = useState(null);
+  // Pending removal awaiting doctor confirmation: null | {date, phase}
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   // ── Fetch ────────────────────────────────────────────────────────────────
 
@@ -490,8 +489,12 @@ export default function DoctorAvailability() {
       setError(err.response?.data?.message ?? "Failed to delete slot.");
     } finally {
       setDeleting(null);
+      setPendingDelete(null);
     }
   };
+
+  // Asks for confirmation before deleting
+  const requestDelete = (date, phase) => setPendingDelete({ date, phase });
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -544,7 +547,7 @@ export default function DoctorAvailability() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDelete(avail.date, phase)}
+                      onClick={() => requestDelete(avail.date, phase)}
                       disabled={!!deleting}
                       className="text-xs font-medium text-error hover:underline disabled:opacity-50"
                     >
@@ -580,10 +583,13 @@ export default function DoctorAvailability() {
     );
   };
 
-  // Sort availability by date ascending
-  const sorted = [...availability].sort(
-    (a, b) => new Date(a.date) - new Date(b.date),
-  );
+  // Sort availability by date ascending and hide past dates.
+  // Past-date entries shouldn't normally exist (backend rejects them) but
+  // can linger if the server was running in a different timezone or from
+  // older data. Hiding them on the frontend prevents accidental edits.
+  const sorted = [...availability]
+    .filter((a) => !isPastDate(a.date))
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -646,6 +652,19 @@ export default function DoctorAvailability() {
           saveError={saveError}
         />
       )}
+
+      {/* Remove availability confirmation dialog */}
+      <ConfirmDialog
+        open={!!pendingDelete}
+        icon="warning"
+        title="Remove Availability Slot?"
+        message={`This will permanently remove the ${pendingDelete?.phase} slots for ${pendingDelete?.date}. Any unbooked slots will be deleted. Already-booked appointments are not affected.`}
+        confirmLabel="Yes, Remove"
+        cancelLabel="Keep It"
+        loading={!!deleting}
+        onConfirm={() => handleDelete(pendingDelete.date, pendingDelete.phase)}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

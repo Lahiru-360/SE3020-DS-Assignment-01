@@ -123,12 +123,9 @@ export const deleteDoctorProfileService = async (userId) => {
 };
 
 // ─── Internal search (called by appointment-service) ─────────────────────────
+// No-filter call returns all approved doctors (browse mode).
 
 export const searchDoctorsService = async ({ specialization, name } = {}) => {
-  if (!specialization && !name) {
-    throw createHttpError('At least one search filter (specialization or name) is required', 400);
-  }
-
   const doctors = await searchDoctors({ specialization, name });
   return doctors;
 };

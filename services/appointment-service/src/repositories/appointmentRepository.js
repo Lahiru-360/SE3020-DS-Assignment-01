@@ -15,14 +15,15 @@ export const updateAppointmentById = (id, updates) =>
 
 export const deleteAppointmentById = (id) => AppointmentModel.findByIdAndDelete(id);
 
-// ─── Active bookings for a doctor on a specific date (for slot computation) ──
-// dateStr must be "YYYY-MM-DD". Queries pending + confirmed only — cancelled/
-// completed appointments do NOT occupy a slot.
+// ─── Active bookings for one doctor on one date (slot allocation) ───────────
+// dateStr must be "YYYY-MM-DD".
+// Only active appointments count: pending/confirmed (cancelled/completed are ignored).
+// Failed payments are excluded from slot occupancy.
 //
-// UTC boundary note: `new Date("YYYY-MM-DD")` in Node.js is interpreted as
-// UTC midnight, so the start/end boundaries here (T00:00:00.000Z / T23:59:59.999Z)
-// are consistent with how bookAppointmentService stores dates via `new Date(date)`.
-// Both sides use UTC — do NOT change one without changing the other.
+// UTC contract:
+// - Node treats new Date("YYYY-MM-DD") as UTC midnight.
+// - We query full UTC day bounds: 00:00:00.000Z to 23:59:59.999Z.
+// - This must stay aligned with bookAppointmentService date storage logic.
 export const findActiveBookingsForDoctorOnDate = (doctorId, dateStr) => {
   const start = new Date(`${dateStr}T00:00:00.000Z`);
   const end   = new Date(`${dateStr}T23:59:59.999Z`);
@@ -34,8 +35,9 @@ export const findActiveBookingsForDoctorOnDate = (doctorId, dateStr) => {
   }).select('timeSlot');
 };
 
-// ─── Single-slot conflict check (double-booking prevention) ──────────────────
-// Returns the conflicting appointment document if slot is taken, null if free.
+// ─── Single-slot conflict check (prevents double-booking) ───────────────────
+// Same active-booking rules and UTC day bounds as above.
+// Returns the conflicting appointment if occupied, otherwise null.
 export const findActiveBookingForSlot = (doctorId, dateStr, timeSlot) => {
   const start = new Date(`${dateStr}T00:00:00.000Z`);
   const end   = new Date(`${dateStr}T23:59:59.999Z`);
