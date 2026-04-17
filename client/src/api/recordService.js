@@ -15,7 +15,7 @@ export const uploadRecord = (formData) =>
 export const getMyRecords = () => axiosInstance.get("/patients/me/reports");
 
 /**
- * Get a short-lived Supabase signed URL for a specific record.
+ * Get a short-lived Supabase signed URL for a specific record (patient).
  * @param {string} reportId
  */
 export const getRecordSignedUrl = (reportId) =>
@@ -27,3 +27,20 @@ export const getRecordSignedUrl = (reportId) =>
  */
 export const deleteRecord = (reportId) =>
   axiosInstance.delete(`/patients/me/reports/${reportId}`);
+
+// ── Doctor-facing (read-only) ──────────────────────────────────────────────
+
+/**
+ * Get all medical records for a patient (doctor must have an appointment).
+ * @param {string} patientId
+ */
+export const getPatientRecordsForDoctor = (patientId) =>
+  axiosInstance.get(`/doctor-patients/${patientId}/reports`);
+
+/**
+ * Get a signed URL for a patient's record (doctor-facing).
+ * @param {string} patientId
+ * @param {string} reportId
+ */
+export const getPatientRecordSignedUrlForDoctor = (patientId, reportId) =>
+  axiosInstance.get(`/doctor-patients/${patientId}/reports/${reportId}/url`);

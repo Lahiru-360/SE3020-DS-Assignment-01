@@ -1,4 +1,4 @@
-import { validationResult } from 'express-validator';
+import { validationResult } from "express-validator";
 import {
   bookAppointmentService,
   getMyAppointmentsService,
@@ -9,8 +9,9 @@ import {
   getAppointmentByIdService,
   updatePaymentStatusService,
   deleteAppointmentInternalService,
-} from '../services/appointmentService.js';
-import { sendSuccess, sendError } from '../utils/responseHelper.js';
+} from "../services/appointmentService.js";
+import { findAppointmentsByDoctorAndPatient } from "../repositories/appointmentRepository.js";
+import { sendSuccess, sendError } from "../utils/responseHelper.js";
 
 // POST /api/appointments — patient books an appointment
 export const bookAppointment = async (req, res, next) => {
@@ -18,8 +19,8 @@ export const bookAppointment = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
 
-    const patientId = req.headers['x-user-id'];
-    if (!patientId) return sendError(res, 'Unauthorized', 401);
+    const patientId = req.headers["x-user-id"];
+    if (!patientId) return sendError(res, "Unauthorized", 401);
 
     const { doctorId, date, phase, notes, type, consultationFee } = req.body;
 
@@ -33,7 +34,12 @@ export const bookAppointment = async (req, res, next) => {
       consultationFee,
     });
 
-    return sendSuccess(res, appointment, 'Appointment booked successfully', 201);
+    return sendSuccess(
+      res,
+      appointment,
+      "Appointment booked successfully",
+      201,
+    );
   } catch (e) {
     next(e);
   }
@@ -42,11 +48,11 @@ export const bookAppointment = async (req, res, next) => {
 // GET /api/appointments/my — patient views own appointments
 export const getMyAppointments = async (req, res, next) => {
   try {
-    const patientId = req.headers['x-user-id'];
-    if (!patientId) return sendError(res, 'Unauthorized', 401);
+    const patientId = req.headers["x-user-id"];
+    if (!patientId) return sendError(res, "Unauthorized", 401);
 
     const appointments = await getMyAppointmentsService(patientId);
-    return sendSuccess(res, appointments, 'Appointments fetched');
+    return sendSuccess(res, appointments, "Appointments fetched");
   } catch (e) {
     next(e);
   }
@@ -55,11 +61,11 @@ export const getMyAppointments = async (req, res, next) => {
 // GET /api/appointments/doctor — doctor views their appointments
 export const getDoctorAppointments = async (req, res, next) => {
   try {
-    const doctorId = req.headers['x-user-id'];
-    if (!doctorId) return sendError(res, 'Unauthorized', 401);
+    const doctorId = req.headers["x-user-id"];
+    if (!doctorId) return sendError(res, "Unauthorized", 401);
 
     const appointments = await getDoctorAppointmentsService(doctorId);
-    return sendSuccess(res, appointments, 'Appointments fetched');
+    return sendSuccess(res, appointments, "Appointments fetched");
   } catch (e) {
     next(e);
   }
@@ -68,12 +74,16 @@ export const getDoctorAppointments = async (req, res, next) => {
 // PATCH /api/appointments/:id/cancel — patient or doctor cancels
 export const cancelAppointment = async (req, res, next) => {
   try {
-    const userId = req.headers['x-user-id'];
-    const role   = req.headers['x-user-role'];
-    if (!userId) return sendError(res, 'Unauthorized', 401);
+    const userId = req.headers["x-user-id"];
+    const role = req.headers["x-user-role"];
+    if (!userId) return sendError(res, "Unauthorized", 401);
 
-    const appointment = await cancelAppointmentService(req.params.id, userId, role);
-    return sendSuccess(res, appointment, 'Appointment cancelled');
+    const appointment = await cancelAppointmentService(
+      req.params.id,
+      userId,
+      role,
+    );
+    return sendSuccess(res, appointment, "Appointment cancelled");
   } catch (e) {
     next(e);
   }
@@ -85,12 +95,16 @@ export const updateAppointmentStatus = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return sendError(res, errors.array()[0].msg, 422);
 
-    const doctorId = req.headers['x-user-id'];
-    if (!doctorId) return sendError(res, 'Unauthorized', 401);
+    const doctorId = req.headers["x-user-id"];
+    if (!doctorId) return sendError(res, "Unauthorized", 401);
 
     const { status } = req.body;
-    const appointment = await updateAppointmentStatusService(req.params.id, doctorId, status);
-    return sendSuccess(res, appointment, 'Appointment status updated');
+    const appointment = await updateAppointmentStatusService(
+      req.params.id,
+      doctorId,
+      status,
+    );
+    return sendSuccess(res, appointment, "Appointment status updated");
   } catch (e) {
     next(e);
   }
@@ -104,7 +118,7 @@ export const searchDoctors = async (req, res, next) => {
 
     const { specialization, name } = req.query;
     const doctors = await searchDoctorsService({ specialization, name });
-    return sendSuccess(res, doctors, 'Doctors retrieved');
+    return sendSuccess(res, doctors, "Doctors retrieved");
   } catch (e) {
     next(e);
   }
@@ -114,8 +128,8 @@ export const searchDoctors = async (req, res, next) => {
 export const getAppointmentInternal = async (req, res, next) => {
   try {
     const appointment = await getAppointmentByIdService(req.params.id);
-    if (!appointment) return sendError(res, 'Appointment not found', 404);
-    return sendSuccess(res, appointment, 'Appointment fetched');
+    if (!appointment) return sendError(res, "Appointment not found", 404);
+    return sendSuccess(res, appointment, "Appointment fetched");
   } catch (e) {
     next(e);
   }
@@ -125,13 +139,17 @@ export const getAppointmentInternal = async (req, res, next) => {
 export const updateAppointmentStatusInternal = async (req, res, next) => {
   try {
     const { status } = req.body;
-    if (!status) return sendError(res, 'status is required', 422);
+    if (!status) return sendError(res, "status is required", 422);
 
     const appointment = await getAppointmentByIdService(req.params.id);
-    if (!appointment) return sendError(res, 'Appointment not found', 404);
+    if (!appointment) return sendError(res, "Appointment not found", 404);
 
-    const updated = await updateAppointmentStatusService(req.params.id, appointment.doctorId, status);
-    return sendSuccess(res, updated, 'Appointment status updated internally');
+    const updated = await updateAppointmentStatusService(
+      req.params.id,
+      appointment.doctorId,
+      status,
+    );
+    return sendSuccess(res, updated, "Appointment status updated internally");
   } catch (e) {
     next(e);
   }
@@ -143,18 +161,18 @@ export const updatePaymentStatusInternal = async (req, res, next) => {
   try {
     const { paymentStatus, paymentId } = req.body;
     if (!paymentStatus && !paymentId) {
-      return sendError(res, 'paymentStatus or paymentId is required', 422);
+      return sendError(res, "paymentStatus or paymentId is required", 422);
     }
 
     const appointment = await getAppointmentByIdService(req.params.id);
-    if (!appointment) return sendError(res, 'Appointment not found', 404);
+    if (!appointment) return sendError(res, "Appointment not found", 404);
 
     const updates = {};
     if (paymentStatus) updates.paymentStatus = paymentStatus;
     if (paymentId) updates.paymentId = paymentId;
 
     const updated = await updatePaymentStatusService(req.params.id, updates);
-    return sendSuccess(res, updated, 'Appointment payment status updated');
+    return sendSuccess(res, updated, "Appointment payment status updated");
   } catch (e) {
     next(e);
   }
@@ -164,9 +182,26 @@ export const updatePaymentStatusInternal = async (req, res, next) => {
 export const deleteAppointmentInternal = async (req, res, next) => {
   try {
     const deleted = await deleteAppointmentInternalService(req.params.id);
-    return sendSuccess(res, deleted, 'Appointment deleted');
+    return sendSuccess(res, deleted, "Appointment deleted");
   } catch (e) {
     next(e);
   }
 };
 
+// GET /api/appointments/internal/by-doctor-patient?doctorId=&patientId=
+// Internal: check if doctor has any non-cancelled appointment with a patient.
+export const getAppointmentsByDoctorAndPatient = async (req, res, next) => {
+  try {
+    const { doctorId, patientId } = req.query;
+    if (!doctorId || !patientId) {
+      return sendError(res, "doctorId and patientId are required", 422);
+    }
+    const appointments = await findAppointmentsByDoctorAndPatient(
+      doctorId,
+      patientId,
+    );
+    return sendSuccess(res, appointments, "Appointments fetched");
+  } catch (e) {
+    next(e);
+  }
+};

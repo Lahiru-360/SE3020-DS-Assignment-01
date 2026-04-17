@@ -8,6 +8,10 @@ import {
   downloadPrescriptionPdf,
 } from "../../api/doctorService";
 import { endSession } from "../../api/telemedicineService";
+import {
+  getPatientRecordsForDoctor,
+  getPatientRecordSignedUrlForDoctor,
+} from "../../api/recordService";
 import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 import StatusBadge from "../../components/ui/StatusBadge";
@@ -148,6 +152,7 @@ function PrescriptionView({ prescription }) {
 
 function AppointmentDetailModal({ appt, userId, onClose, onAction, acting }) {
   const isCompleted = appt.status === "completed";
+  const isConfirmed = appt.status === "confirmed";
   const isVirtualConfirmed =
     appt.type === "VIRTUAL" && appt.status === "confirmed";
 
@@ -167,6 +172,12 @@ function AppointmentDetailModal({ appt, userId, onClose, onAction, acting }) {
   const [endingSession, setEndingSession] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
 
+  // Medical records state (doctor read-only view)
+  const canViewRecords = isConfirmed || isCompleted;
+  const [records, setRecords] = useState(null);
+  const [recordsLoading, setRecordsLoading] = useState(canViewRecords);
+  const [recordsError, setRecordsError] = useState("");
+
   const handleEndSession = async (e) => {
     e.stopPropagation();
     setEndingSession(true);
@@ -181,6 +192,36 @@ function AppointmentDetailModal({ appt, userId, onClose, onAction, acting }) {
       );
     } finally {
       setEndingSession(false);
+    }
+  };
+
+  // Fetch medical records for confirmed/completed appointments
+  useEffect(() => {
+    if (!canViewRecords || !appt.patientId) return;
+    getPatientRecordsForDoctor(appt.patientId)
+      .then((res) => setRecords(res.data?.data ?? []))
+      .catch(() => setRecordsError("Failed to load medical records."))
+      .finally(() => setRecordsLoading(false));
+  }, [canViewRecords, appt.patientId]);
+
+  const handleDownloadRecord = async (reportId, fileName) => {
+    setRecordsError("");
+    try {
+      const res = await getPatientRecordSignedUrlForDoctor(
+        appt.patientId,
+        reportId,
+      );
+      const url = res.data?.data?.url;
+      if (!url) throw new Error("No URL returned");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      setRecordsError("Failed to download record. Please try again.");
     }
   };
 
@@ -462,6 +503,64 @@ function AppointmentDetailModal({ appt, userId, onClose, onAction, acting }) {
                   >
                     Write Prescription
                   </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Medical Records — confirmed or completed appointments */}
+          {canViewRecords && (
+            <div className="border-t border-border pt-5">
+              <p className="text-sm font-semibold text-text-primary mb-4">
+                Patient Medical Records
+              </p>
+
+              {recordsError && <Alert type="error">{recordsError}</Alert>}
+
+              {recordsLoading ? (
+                <div className="py-6">
+                  <Loader />
+                </div>
+              ) : !records || records.length === 0 ? (
+                <div className="rounded-lg bg-bg-main border border-border px-4 py-6 text-center">
+                  <p className="text-sm text-text-muted">
+                    No medical records uploaded by this patient yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {records.map((r) => (
+                    <div
+                      key={r._id}
+                      className="rounded-lg bg-bg-main border border-border px-4 py-3 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-text-primary truncate">
+                          {r.fileName}
+                        </p>
+                        {r.description && (
+                          <p className="text-xs text-text-muted truncate">
+                            {r.description}
+                          </p>
+                        )}
+                        <p className="text-xs text-text-muted mt-0.5">
+                          {new Date(r.createdAt).toLocaleDateString("en-US", {
+                            dateStyle: "medium",
+                          })}
+                          {r.fileSize
+                            ? ` · ${(r.fileSize / 1024).toFixed(0)} KB`
+                            : ""}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadRecord(r._id, r.fileName)}
+                        className="shrink-0 px-3 py-1.5 rounded-lg border border-primary text-primary text-xs font-semibold hover:bg-bg-card transition-colors"
+                      >
+                        Download
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
