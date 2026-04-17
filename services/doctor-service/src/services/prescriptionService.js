@@ -233,11 +233,12 @@ export const generatePrescriptionPdfForUserService = async (
   if (!patient) throw new Error("Patient not found");
 
   const doctorName = `${doctor.firstName} ${doctor.lastName}`.trim();
+  const doctorSpec = doctor.specialization ?? "";
+  const doctorLicense = doctor.licenseNumber ?? "";
   const patientName = `${patient.firstName} ${patient.lastName}`.trim();
 
-  const doc = new PDFDocument({ size: "A4", margin: 50 });
+  const doc = new PDFDocument({ size: "A4", margin: 0 });
   const chunks = [];
-
   const logoPath = path.join(__dirname, "../assets/logo.png");
 
   return await new Promise((resolve, reject) => {
@@ -247,134 +248,333 @@ export const generatePrescriptionPdfForUserService = async (
     );
     doc.on("error", reject);
 
-    //  HEADER
-    doc.image(logoPath, 50, 40, { width: 50 });
+    const PW = doc.page.width; // 595.28
+    const PH = doc.page.height; // 841.89
+    const M = 50; // side margin
+    const CW = PW - 2 * M; // usable content width = 495.28
 
-    doc
-      .fontSize(20)
-      .fillColor(COLORS.primary)
-      .text("CareLink Health Platform", 110, 45);
+    // ─────────────────────────────────────────────────────────────────
+    // 1. HEADER BAND — full-width deep blue
+    // ─────────────────────────────────────────────────────────────────
+    doc.rect(0, 0, PW, 130).fill(COLORS.primary);
 
-    doc
-      .fontSize(10)
-      .fillColor(COLORS.textSecondary)
-      .text("Digital Prescription System", 110, 70);
-
-    doc.moveDown(2);
-
-    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke(COLORS.border);
-
-    doc.moveDown();
-
-    //  DETAILS
-    doc.fontSize(12).fillColor(COLORS.textPrimary);
-
-    doc.text(`Prescription ID: ${prescription._id}`);
-    doc.text(
-      `Issued Date: ${new Date(prescription.issuedDate).toDateString()}`,
-    );
-    doc.text(`Version: ${prescription.version}`);
-
-    doc.moveDown();
-
-    doc.font("Helvetica-Bold").text("Doctor:");
-    doc.font("Helvetica").text(`Dr. ${doctorName || "Unknown"}`);
-
-    doc.moveDown(0.5);
-
-    doc.font("Helvetica-Bold").text("Patient:");
-    doc.font("Helvetica").text(`${patientName || "Unknown"}`);
-
-    doc.moveDown();
-
-    //  DIAGNOSIS
-    doc
-      .fontSize(14)
-      .fillColor(COLORS.primary)
-      .text("Diagnosis", { underline: true });
-
-    doc.fontSize(12).fillColor(COLORS.textPrimary).text(prescription.diagnosis);
-
-    doc.moveDown();
-
-    //  TABLE
-    const colX = {
-      name: 50,
-      dosage: 180,
-      frequency: 300,
-      duration: 430,
-    };
-
-    doc
-      .fontSize(14)
-      .fillColor(COLORS.primary)
-      .text("Medications", { underline: true });
-
-    doc.moveDown(0.5);
-
-    doc.font("Helvetica-Bold").fontSize(11);
-
-    let y = doc.y;
-
-    doc.text("Name", colX.name, y);
-    doc.text("Dosage", colX.dosage, y);
-    doc.text("Frequency", colX.frequency, y);
-    doc.text("Duration", colX.duration, y);
-
-    doc.moveDown(0.5);
-
-    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke(COLORS.border);
-
-    doc.moveDown(0.5);
-
-    doc.font("Helvetica").fontSize(11);
-
-    prescription.medications.forEach((med) => {
-      y = doc.y;
-
-      doc.text(med.name, colX.name, y);
-      doc.text(med.dosage, colX.dosage, y);
-      doc.text(med.frequency, colX.frequency, y);
-      doc.text(med.duration, colX.duration, y);
-
-      doc.moveDown();
-    });
-
-    doc.moveDown();
-
-    //  NOTES
-    if (prescription.notes) {
-      const notesX = 350;
-      let notesY = doc.y;
-
-      doc
-        .fontSize(14)
-        .fillColor(COLORS.primary)
-        .text("Notes", notesX, notesY, { underline: true });
-
-      notesY += 20;
-
-      doc
-        .fontSize(12)
-        .fillColor(COLORS.textPrimary)
-        .text(prescription.notes, notesX, notesY, {
-          width: 180, // wrap text nicely
-        });
-
-      doc.moveDown();
+    try {
+      doc.image(logoPath, M, 28, { width: 58 });
+    } catch {
+      /* optional */
     }
 
-    //  FOOTER
-    const pageHeight = doc.page.height;
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(22)
+      .fillColor("#ffffff")
+      .text("CareLink Health Platform", M + 74, 35, { lineBreak: false });
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .fillColor("#8ec6e0")
+      .text("Licensed Digital Prescription", M + 74, 63, { lineBreak: false });
+
+    // Right-side prescription metadata
+    const issuedStr = new Date(prescription.issuedDate).toLocaleDateString(
+      "en-US",
+      {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      },
+    );
+    const metaW = 185;
+    const metaX = PW - M - metaW;
 
     doc
-      .fontSize(10)
+      .font("Helvetica")
+      .fontSize(7.5)
+      .fillColor("#8ec6e0")
+      .text("PRESCRIPTION ID", metaX, 28, {
+        width: metaW,
+        align: "right",
+        lineBreak: false,
+      });
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(8)
+      .fillColor("#ffffff")
+      .text(String(prescription._id), metaX, 41, {
+        width: metaW,
+        align: "right",
+        lineBreak: false,
+      });
+    doc
+      .font("Helvetica")
+      .fontSize(7.5)
+      .fillColor("#8ec6e0")
+      .text("DATE ISSUED", metaX, 65, {
+        width: metaW,
+        align: "right",
+        lineBreak: false,
+      });
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(11)
+      .fillColor("#ffffff")
+      .text(issuedStr, metaX, 78, {
+        width: metaW,
+        align: "right",
+        lineBreak: false,
+      });
+    doc
+      .font("Helvetica")
+      .fontSize(7.5)
+      .fillColor("#8ec6e0")
+      .text(`VERSION  ${prescription.version}`, metaX, 104, {
+        width: metaW,
+        align: "right",
+        lineBreak: false,
+      });
+
+    // ─────────────────────────────────────────────────────────────────
+    // 2. ACCENT STRIPE — green separator
+    // ─────────────────────────────────────────────────────────────────
+    doc.rect(0, 130, PW, 5).fill(COLORS.accent);
+
+    // ─────────────────────────────────────────────────────────────────
+    // 3. INFO PANEL — doctor | patient two-column layout
+    // ─────────────────────────────────────────────────────────────────
+    doc.rect(0, 135, PW, 105).fill("#eef3f8");
+
+    // "Rx" stamp (left anchor)
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(36)
+      .fillColor(COLORS.primary)
+      .text("Rx", M, 156, { width: 44, lineBreak: false });
+
+    // Doctor block
+    doc
+      .font("Helvetica")
+      .fontSize(7.5)
+      .fillColor(COLORS.textSecondary)
+      .text("PRESCRIBING DOCTOR", M + 54, 151, {
+        width: 188,
+        lineBreak: false,
+      });
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(12)
+      .fillColor(COLORS.textPrimary)
+      .text(`Dr. ${doctorName}`, M + 54, 164, { width: 188, lineBreak: false });
+
+    let infoY = 182;
+    if (doctorSpec) {
+      doc
+        .font("Helvetica")
+        .fontSize(9)
+        .fillColor(COLORS.textSecondary)
+        .text(doctorSpec, M + 54, infoY, { width: 188, lineBreak: false });
+      infoY += 15;
+    }
+    if (doctorLicense) {
+      doc
+        .font("Helvetica")
+        .fontSize(8)
+        .fillColor(COLORS.textSecondary)
+        .text(`Reg. No: ${doctorLicense}`, M + 54, infoY, {
+          width: 188,
+          lineBreak: false,
+        });
+    }
+
+    // Vertical divider between the two panels
+    doc
+      .strokeColor("#b8ccdb")
+      .moveTo(M + 254, 148)
+      .lineTo(M + 254, 228)
+      .lineWidth(0.5)
+      .stroke();
+
+    // Patient block
+    const patX = M + 272;
+    doc
+      .font("Helvetica")
+      .fontSize(7.5)
+      .fillColor(COLORS.textSecondary)
+      .text("PATIENT", patX, 151, { width: 210, lineBreak: false });
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(12)
+      .fillColor(COLORS.textPrimary)
+      .text(patientName, patX, 164, { width: 210, lineBreak: false });
+
+    // ─────────────────────────────────────────────────────────────────
+    // 4. CONTENT AREA
+    // ─────────────────────────────────────────────────────────────────
+    let y = 263;
+
+    /**
+     * Draws a labelled section heading with a 4-pt left accent bar
+     * and advances the shared `y` cursor.
+     */
+    const drawSection = (label) => {
+      doc.rect(M, y, 4, 20).fill(COLORS.accent);
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(13)
+        .fillColor(COLORS.primary)
+        .text(label, M + 14, y + 3, { lineBreak: false });
+      y += 32;
+    };
+
+    // ── DIAGNOSIS ────────────────────────────────────────────────────
+    drawSection("Diagnosis");
+
+    doc.font("Helvetica").fontSize(11);
+    const diagH = Math.max(
+      44,
+      doc.heightOfString(prescription.diagnosis, { width: CW - 26 }) + 18,
+    );
+    doc.rect(M, y, CW, diagH).fill("#edf5fb");
+    doc.rect(M, y, 3, diagH).fill(COLORS.primary);
+    doc
+      .font("Helvetica")
+      .fontSize(11)
+      .fillColor(COLORS.textPrimary)
+      .text(prescription.diagnosis, M + 14, y + 10, { width: CW - 26 });
+    y += diagH + 24;
+
+    // ── MEDICATIONS TABLE ─────────────────────────────────────────────
+    drawSection("Medications");
+
+    const COLS = [
+      { label: "MEDICATION", x: M, w: 155 },
+      { label: "DOSAGE", x: M + 155, w: 100 },
+      { label: "FREQUENCY", x: M + 255, w: 130 },
+      { label: "DURATION", x: M + 385, w: CW - 385 },
+    ];
+    const ROW_H = 26;
+    const tableTopY = y;
+
+    // Header row
+    doc.rect(M, y, CW, ROW_H).fill(COLORS.primary);
+    COLS.forEach((col) => {
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(8.5)
+        .fillColor("#ffffff")
+        .text(col.label, col.x + 8, y + 9, {
+          width: col.w - 10,
+          lineBreak: false,
+        });
+    });
+    y += ROW_H;
+
+    // Data rows
+    prescription.medications.forEach((med, i) => {
+      doc.rect(M, y, CW, ROW_H).fill(i % 2 === 0 ? "#ffffff" : "#f0f6fb");
+      doc
+        .strokeColor("#d0e6f4")
+        .moveTo(M, y + ROW_H)
+        .lineTo(M + CW, y + ROW_H)
+        .lineWidth(0.3)
+        .stroke();
+
+      const vals = [med.name, med.dosage, med.frequency, med.duration];
+      COLS.forEach((col, ci) => {
+        doc
+          .font(ci === 0 ? "Helvetica-Bold" : "Helvetica")
+          .fontSize(9)
+          .fillColor(COLORS.textPrimary)
+          .text(vals[ci] ?? "—", col.x + 8, y + 9, {
+            width: col.w - 12,
+            lineBreak: false,
+          });
+      });
+      y += ROW_H;
+    });
+
+    // Outer table border
+    doc
+      .lineWidth(0.5)
+      .strokeColor("#b0c8db")
+      .rect(M, tableTopY, CW, y - tableTopY)
+      .stroke();
+
+    // Vertical column dividers
+    [155, 255, 385].forEach((off) => {
+      doc
+        .strokeColor("#b0c8db")
+        .lineWidth(0.3)
+        .moveTo(M + off, tableTopY)
+        .lineTo(M + off, y)
+        .stroke();
+    });
+
+    y += 24;
+
+    // ── CLINICAL NOTES (optional) ─────────────────────────────────────
+    if (prescription.notes) {
+      drawSection("Clinical Notes");
+
+      doc.font("Helvetica").fontSize(10);
+      const noteH = Math.max(
+        40,
+        doc.heightOfString(prescription.notes, { width: CW - 26 }) + 18,
+      );
+      doc.rect(M, y, CW, noteH).fill("#fffcf0");
+      doc.rect(M, y, 3, noteH).fill("#f0a500");
+      doc
+        .font("Helvetica")
+        .fontSize(10)
+        .fillColor(COLORS.textSecondary)
+        .text(prescription.notes, M + 14, y + 10, { width: CW - 24 });
+      y += noteH + 20;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // 5. FOOTER
+    // ─────────────────────────────────────────────────────────────────
+    const footerY = PH - 65;
+
+    doc
+      .strokeColor(COLORS.border)
+      .moveTo(M, footerY)
+      .lineTo(PW - M, footerY)
+      .lineWidth(0.5)
+      .stroke();
+
+    // "DIGITALLY VERIFIED" pill badge
+    doc.rect(M, footerY + 10, 106, 16).fill(COLORS.accent);
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(7.5)
+      .fillColor("#ffffff")
+      .text("DIGITALLY VERIFIED", M + 4, footerY + 14, {
+        width: 98,
+        align: "center",
+        lineBreak: false,
+      });
+
+    doc
+      .font("Helvetica")
+      .fontSize(7.5)
       .fillColor(COLORS.textSecondary)
       .text(
-        "This is a digitally generated prescription. No signature required.",
-        50,
-        pageHeight - 50,
-        { align: "center", width: 500 },
+        "This prescription is digitally generated and verified by CareLink Health Platform. " +
+          "No handwritten signature is required.",
+        M + 114,
+        footerY + 13,
+        { width: CW - 114, lineBreak: true },
+      );
+
+    doc
+      .font("Helvetica")
+      .fontSize(7)
+      .fillColor("#8a9eb0")
+      .text(
+        `Generated: ${new Date().toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" })}  -  Prescription v${prescription.version}`,
+        M,
+        footerY + 40,
+        { width: CW, align: "center", lineBreak: false },
       );
 
     doc.end();

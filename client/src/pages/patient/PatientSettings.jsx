@@ -59,7 +59,7 @@ export default function PatientSettings() {
   const validate = () => {
     const errs = {};
     const nameRe = /^[a-zA-Z\s'-]+$/;
-    const phoneRe = /^\+?[\d\s-]{7,15}$/;
+    const phoneRe = /^\d{10}$/;
 
     if (form.firstName) {
       if (!nameRe.test(form.firstName))
@@ -76,7 +76,7 @@ export default function PatientSettings() {
         errs.lastName = "Last name must not exceed 50 characters.";
     }
     if (form.phone && !phoneRe.test(form.phone)) {
-      errs.phone = "Enter a valid phone number (7–15 digits).";
+      errs.phone = "Enter a valid 10-digit phone number.";
     }
 
     return errs;
@@ -169,10 +169,15 @@ export default function PatientSettings() {
           <FormInput
             id="patient-phone"
             label="Phone Number"
+            type="tel"
             value={form.phone}
-            onChange={handleChange("phone")}
-            placeholder="e.g. +94771234567"
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+              handleChange("phone")({ target: { value: digits } });
+            }}
+            placeholder="e.g. 0771234567"
             error={fieldErrors.phone}
+            maxLength={10}
           />
 
           <button

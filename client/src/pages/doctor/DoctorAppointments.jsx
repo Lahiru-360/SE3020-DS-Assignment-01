@@ -47,10 +47,6 @@ const FILTER_LABELS = {
   cancelled: "Cancelled",
 };
 
-// Actions available per status.
-// "confirm" → PATCH /status {status:"confirmed"} (Accept)
-// "complete" → PATCH /status {status:"completed"}
-// "cancel"   → PATCH /cancel  (Reject when pending; Cancel when confirmed)
 const ACTIONS = {
   pending: ["confirm", "cancel"],
   confirmed: ["complete", "cancel"],
@@ -58,7 +54,7 @@ const ACTIONS = {
   cancelled: [],
 };
 
-// ── CloseButton ────────────────────────────────────────────────────────────
+//  CloseButton
 
 function CloseButton({ onClick }) {
   return (
@@ -86,8 +82,7 @@ function CloseButton({ onClick }) {
   );
 }
 
-// ── PrescriptionView ───────────────────────────────────────────────────────
-// Read-only display of an existing prescription inside the detail modal.
+//  PrescriptionView
 
 function PrescriptionView({ prescription }) {
   return (
@@ -770,12 +765,14 @@ export default function DoctorAppointments() {
     }
   };
 
-  // Opens the confirmation dialog; actual action fires only after doctor confirms
+  // For cancel/reject: open confirmation dialog first.
+  // For accept/complete: fire immediately — no confirmation needed.
   const requestAction = (id, action, apptStatus) => {
-    const label = action === "cancel"
-      ? (apptStatus === "pending" ? "Reject" : "Cancel")
-      : action === "confirmed" ? "Accept" : "Mark Complete";
-    setConfirmAction({ id, action, label, apptStatus });
+    if (action === "cancel") {
+      setConfirmAction({ id, action, apptStatus });
+    } else {
+      handleAction(id, action);
+    }
   };
 
   // ── Derived ──────────────────────────────────────────────────────────────
@@ -877,14 +874,16 @@ export default function DoctorAppointments() {
           appt={selectedAppt}
           userId={userId}
           onClose={() => setSelectedAppt(null)}
-          onAction={(id, action) => requestAction(id, action, selectedAppt.status)}
+          onAction={(id, action) =>
+            requestAction(id, action, selectedAppt.status)
+          }
           acting={acting}
         />
       )}
 
       {/* Cancel / Reject confirmation dialog */}
       <ConfirmDialog
-        open={!!confirmAction && (confirmAction.action === "cancel")}
+        open={!!confirmAction && confirmAction.action === "cancel"}
         icon="danger"
         title={
           confirmAction?.apptStatus === "pending"
@@ -896,7 +895,11 @@ export default function DoctorAppointments() {
             ? "The appointment request will be rejected and the patient will be notified."
             : "The confirmed appointment will be cancelled. The patient will be notified."
         }
-        confirmLabel={confirmAction?.apptStatus === "pending" ? "Yes, Reject" : "Yes, Cancel"}
+        confirmLabel={
+          confirmAction?.apptStatus === "pending"
+            ? "Yes, Reject"
+            : "Yes, Cancel"
+        }
         cancelLabel="Keep It"
         loading={acting === confirmAction?.id}
         onConfirm={() => handleAction(confirmAction.id, confirmAction.action)}
