@@ -28,22 +28,20 @@ const buildAppointmentSmsBody = (type, { recipientName, doctorName, specialty, d
 };
 
 // ─── Send a single SMS ────────────────────────────────────────────────────────
-// Returns the Twilio message SID on success.
-// Caller may supply a `message` override; otherwise built-in templates are used.
-// Falls back to a generic body when no built-in template matches the type.
+// Returns Twilio SID. Uses built-in template if available, else generic fallback.
 export const sendSms = async ({ type, recipientPhone, recipientName, message: messageOverride, metadata }) => {
   const isBuiltIn = ['appointment_booked', 'appointment_confirmed', 'appointment_cancelled', 'appointment_completed'].includes(type);
 
   let body;
   if (messageOverride) {
-    // Caller-supplied message (may optionally be prefixed with [HC Platform])
+    // Prefix with [HC Platform] if not already present
     body = messageOverride.startsWith('[HC Platform]')
       ? messageOverride
       : `[HC Platform] ${messageOverride}`;
   } else if (isBuiltIn) {
     body = buildAppointmentSmsBody(type, { recipientName, ...metadata });
   } else {
-    // Generic fallback — works for any event type
+    // Generic fallback for any unrecognised event type
     body = `[HC Platform] Hi ${recipientName}, you have a new notification: ${type}.`;
   }
 

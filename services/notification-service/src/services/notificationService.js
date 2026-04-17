@@ -3,12 +3,7 @@ import { sendSms }   from './smsService.js';
 import { createNotification } from '../repositories/notificationRepository.js';
 
 // ─── Process a notification request from any internal service ────────────────
-//
-// channel: 'email' | 'sms' | 'both' (default: 'both' for backward compat)
-// subject: optional email subject override
-// message: optional plain-text body override (used for both email and SMS)
-// source:  optional originating service label (e.g. 'appointment-service')
-//
+// channel: 'email'|'sms'|'both' | subject/message: overrides | source: caller label
 export const processNotificationService = async ({
   type,
   channel = 'both',
@@ -56,7 +51,7 @@ export const processNotificationService = async ({
       smsStatus = 'failed';
     }
   } else if (sendSms_ && !recipientPhone) {
-    // channel requested SMS but no phone supplied — log and skip gracefully
+    // SMS requested but no phone — skip gracefully
     console.warn(`[NotificationService] SMS skipped — no recipientPhone provided for type: ${type}`);
   }
 

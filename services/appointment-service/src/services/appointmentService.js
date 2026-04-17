@@ -24,8 +24,7 @@ const internalHeaders = () => ({
 });
 
 // ─── Book appointment ───────────────────────────────────────────────────────
-// Patient supplies { doctorId, date, phase: "morning"|"evening", notes }.
-// The system auto-assigns the nearest free 20-min slot in that phase (queue).
+// Validates doctor, picks the first free 20-min slot in the requested phase, persists, notifies.
 export const bookAppointmentService = async ({
   patientId,
   doctorId,
@@ -74,18 +73,11 @@ export const bookAppointmentService = async ({
   const bookings = await findActiveBookingsForDoctorOnDate(doctorId, dateStr);
   const bookedSet = new Set(bookings.map((b) => b.timeSlot));
 
-  // 7. Queue: pick the first slot not yet booked AND not already started (same-day guard)
-  //
-  // When the appointment is for TODAY (in the configured timezone), we skip any
-  // slot whose 20-min window has already begun — slotStart <= localNow.
-  // Example: booking at 10:21 LKT → skip 10:20, assign 10:40.
-  //
-  // TIMEZONE env var controls which timezone "today" and "now" are evaluated
-  // in. Defaults to Asia/Colombo (Sri Lanka, UTC+5:30). Change it in .env if
-  // the server is relocated.
+  // 7. Pick the first free slot that hasn't started yet (same-day: skip elapsed slots).
+  // Uses TIMEZONE env var (default Asia/Colombo) to determine local "now".
   const tz = process.env.TIMEZONE || "Asia/Colombo";
 
-  // Get the current local date string "YYYY-MM-DD" in the configured timezone
+  // Today's date string "YYYY-MM-DD" in the configured timezone
   const localNowParts = new Intl.DateTimeFormat("en-CA", {
     timeZone: tz,
     year: "numeric",
@@ -95,7 +87,7 @@ export const bookAppointmentService = async ({
   const todayStr = localNowParts.map((p) => p.value).join(""); // "YYYY-MM-DD"
   const isToday = dateStr === todayStr;
 
-  // Get current local time as total minutes (HH * 60 + mm) in the same timezone
+  // Current time in minutes (HH*60+mm) — only needed for same-day bookings
   let nowMinutes = 0;
   if (isToday) {
     const timeParts = new Intl.DateTimeFormat("en-GB", {

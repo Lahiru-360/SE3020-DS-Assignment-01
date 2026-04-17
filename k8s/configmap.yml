@@ -6,35 +6,34 @@ metadata:
   name: hc-config
   namespace: healthcare
 data:
-
   # Service URLs
-  AUTH_SERVICE_URL:         "http://auth-service:5007"
-  PATIENT_SERVICE_URL:      "http://patient-service:5002"
-  DOCTOR_SERVICE_URL:       "http://doctor-service:5001"
-  APPOINTMENT_SERVICE_URL:  "http://appointment-service:5003"
+  AUTH_SERVICE_URL: "http://auth-service:5007"
+  PATIENT_SERVICE_URL: "http://patient-service:5002"
+  DOCTOR_SERVICE_URL: "http://doctor-service:5001"
+  APPOINTMENT_SERVICE_URL: "http://appointment-service:5003"
   NOTIFICATION_SERVICE_URL: "http://notification-service:5004"
   TELEMEDICINE_SERVICE_URL: "http://telemedicine-service:5005"
-  PAYMENT_SERVICE_URL:      "http://payment-service:5006"
-  AI_SERVICE_URL:           "http://ai-service:5008"
+  PAYMENT_SERVICE_URL: "http://payment-service:5006"
+  AI_SERVICE_URL: "http://ai-service:5008"
 
   # auth-service
-  JWT_EXPIRES_IN:         "7d"
+  JWT_EXPIRES_IN: "7d"
   JWT_REFRESH_EXPIRES_IN: "30d"
-  ADMIN_DEFAULT_EMAIL:    "admin@system.com"
+  ADMIN_DEFAULT_EMAIL: "admin@system.com"
 
   # notification-service
-  EMAIL_HOST:                  "smtp.gmail.com"
-  EMAIL_PORT:                  "587"
-  EMAIL_USER:                   "cadilshaprathibha@gmail.com"
-  EMAIL_FROM:                   "HC Platform <cadilshaprathibha@gmail.com>"
+  EMAIL_HOST: "smtp.gmail.com"
+  EMAIL_PORT: "587"
+  EMAIL_USER: "cadilshaprathibha@gmail.com"
+  EMAIL_FROM: "HC Platform <cadilshaprathibha@gmail.com>"
   TWILIO_MESSAGING_SERVICE_SID: "MGe1f73a9ce1ed6f816c244bd98781bbf1"
 
-  # appointment-service
-  TIMEZONE:               "Asia/Colombo"
-  SLOT_DURATION_MINUTES:  "20"
+  # appointment-service + doctor-service
+  TIMEZONE: "Asia/Colombo"
+  SLOT_DURATION_MINUTES: "20"
 
   # ai-service
-  GEMINI_MODEL:    "gemini-2.0-flash"
+  GEMINI_MODEL:    "gemini-2.5-flash"
   GEMINI_BASE_URL: "https://generativelanguage.googleapis.com/v1beta/models"
 
   # RabbitMQ

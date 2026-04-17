@@ -9,14 +9,15 @@ const Doctor = lazy(() => import("../pages/Doctor"));
 const PatientBookingPage = lazy(
   () => import("../pages/patient/PatientBookingPage"),
 );
+const LandingPage = lazy(() => import("../pages/LandingPage"));
 
 export const appRoutes = [
   {
     path: "/",
-    component: Login,
+    component: LandingPage,
     requiresAuth: false,
-    publicOnly: true,
-    hideChrome: true,
+    publicOnly: false,
+    hideChrome: false,
   },
   {
     path: "/login",

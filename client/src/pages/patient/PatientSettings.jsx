@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../../context/useAuth";
-import { updatePatientProfile } from "../../api/patientService";
+import { getPatientProfile, updatePatientProfile } from "../../api/patientService";
 import FormInput from "../../components/ui/FormInput";
 import Alert from "../../components/ui/Alert";
+import Loader from "../../components/ui/Loader";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -18,10 +19,30 @@ export default function PatientSettings() {
   const { userEmail } = useAuth();
 
   const [form, setForm] = useState(INITIAL_FORM);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
+
+  // ── Load profile on mount ────────────────────────────────────────────────
+
+  useEffect(() => {
+    setLoading(true);
+    getPatientProfile()
+      .then((res) => {
+        const p = res.data?.data ?? {};
+        setForm({
+          firstName: p.firstName ?? "",
+          lastName: p.lastName ?? "",
+          phone: p.phone ?? "",
+        });
+      })
+      .catch(() => {
+        // Profile not found yet (new patient) — keep blank form
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -86,9 +107,14 @@ export default function PatientSettings() {
 
     setSaving(true);
     try {
-      await updatePatientProfile(payload);
+      const res = await updatePatientProfile(payload);
+      const updated = res.data?.data ?? {};
+      setForm({
+        firstName: updated.firstName ?? form.firstName,
+        lastName: updated.lastName ?? form.lastName,
+        phone: updated.phone ?? form.phone,
+      });
       setSuccess("Profile updated successfully.");
-      setForm(INITIAL_FORM);
     } catch (err) {
       setError(err.response?.data?.message ?? "Failed to update profile.");
     } finally {
@@ -97,6 +123,14 @@ export default function PatientSettings() {
   };
 
   // ── Render ─────────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="py-20">
+        <Loader />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-lg mx-auto space-y-6">

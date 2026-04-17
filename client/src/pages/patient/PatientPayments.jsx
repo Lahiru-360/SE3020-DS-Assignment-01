@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   CreditCard,
   RefreshCw,
@@ -73,9 +74,9 @@ function TxStatusBadge({ status }) {
 
 // ── Pay Modal ───────────────────────────────────────────────────────────────
 
-function PayModal({ appointments, onClose, onSuccess }) {
-  const [appointmentId, setAppointmentId] = useState("");
-  const [proceedToPayment, setProceedToPayment] = useState(false);
+function PayModal({ appointments, onClose, onSuccess, initialId }) {
+  const [appointmentId, setAppointmentId] = useState(initialId || "");
+  const [proceedToPayment, setProceedToPayment] = useState(!!initialId);
   const [paySuccess, setPaySuccess] = useState(false);
 
   const unpaidAppointments = appointments.filter(
@@ -83,12 +84,12 @@ function PayModal({ appointments, onClose, onSuccess }) {
   );
 
   const selectedAppointment = unpaidAppointments.find(
-    (a) => a._id === appointmentId,
+    (a) => a._id === (appointmentId || initialId),
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-md mx-4 rounded-xl border border-border bg-bg-card shadow-xl p-6 space-y-5">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 md:pt-20 pb-10 overflow-y-auto bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-md mx-4 rounded-xl border border-border bg-bg-card shadow-xl p-6 space-y-5 relative my-auto">
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-base font-semibold text-text-primary">
@@ -146,7 +147,13 @@ function PayModal({ appointments, onClose, onSuccess }) {
               setPaySuccess(true);
               onSuccess();
             }}
-            onCancel={() => setProceedToPayment(false)}
+            onCancel={() => {
+              if (initialId) {
+                onClose();
+              } else {
+                setProceedToPayment(false);
+              }
+            }}
           />
         ) : (
           <form
@@ -200,18 +207,30 @@ function PayModal({ appointments, onClose, onSuccess }) {
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function PatientPayments() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [transactions, setTransactions] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showPayModal, setShowPayModal] = useState(false);
+  const [preselectedId, setPreselectedId] = useState(null);
 
   function load() {
     setLoading(true);
     Promise.all([getPatientPayments(), getMyAppointments()])
       .then(([txRes, apptRes]) => {
         setTransactions(txRes.data?.data ?? []);
-        setAppointments(apptRes.data?.data ?? []);
+        const appts = apptRes.data?.data ?? [];
+        setAppointments(appts);
+
+        // Check for ?pay=ID in URL
+        const payId = searchParams.get("pay");
+        if (payId && appts.some((a) => a._id === payId)) {
+          setPreselectedId(payId);
+          setShowPayModal(true);
+          // Clear query param to avoid re-opening on manual refresh or back button
+          setSearchParams({}, { replace: true });
+        }
       })
       .catch((err) =>
         setError(err.response?.data?.message ?? "Failed to load payments."),
@@ -247,7 +266,10 @@ export default function PatientPayments() {
           </p>
         </div>
         <button
-          onClick={() => setShowPayModal(true)}
+          onClick={() => {
+            setPreselectedId(null);
+            setShowPayModal(true);
+          }}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors"
         >
           <CreditCard size={15} />
@@ -375,10 +397,15 @@ export default function PatientPayments() {
       {showPayModal && (
         <PayModal
           appointments={appointments}
-          onClose={() => setShowPayModal(false)}
+          onClose={() => {
+            setShowPayModal(false);
+            setPreselectedId(null);
+          }}
           onSuccess={load}
+          initialId={preselectedId}
         />
       )}
     </div>
   );
 }
+

@@ -3,6 +3,7 @@ import {
   createProfile,
   getPatientInternal,
   updateProfile,
+  getOwnProfile,
 } from "../controllers/patientController.js";
 import {
   createPatientProfileValidators,
@@ -24,6 +25,7 @@ router.post(
 router.get("/internal/:userId", requireInternalSecret, getPatientInternal);
 
 // ── Patient-facing (via API Gateway) ──────────────────────────────
+router.get("/me", getOwnProfile);
 router.patch("/me", updatePatientProfileValidators, updateProfile);
 
 export default router;

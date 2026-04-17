@@ -56,23 +56,30 @@ const isWithinPhase = (indexes, phase) => {
 };
 
 export const addAvailabilityService = async (doctorId, date, slots) => {
-  // Validate that the date is within the next 7 days
+  // Enforce 0-7 day range using the configured app timezone.
+  const tz = process.env.TIMEZONE || "Asia/Colombo";
+  const todayStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date()); // "YYYY-MM-DD"
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalize today to midnight
+  const targetDateStr = date.slice(0, 10); // normalise to "YYYY-MM-DD"
 
-  const targetDate = new Date(date);
-  targetDate.setHours(0, 0, 0, 0);
-
-  // Direct comparison for past dates
-  if (targetDate < today) {
+  // Direct string comparison works because both are "YYYY-MM-DD"
+  if (targetDateStr < todayStr) {
     throw createHttpError("Cannot add availability for past dates.", 400);
   }
 
-  const maxDate = new Date(today);
-  maxDate.setDate(today.getDate() + 7);
+  const maxDateStr7 = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
 
-  if (targetDate > maxDate) {
+  if (targetDateStr > maxDateStr7) {
     throw createHttpError(
       "Doctors can only add availability up to 7 days in advance.",
       400,
@@ -175,13 +182,16 @@ export const editAvailabilityTimeslotService = async (
   phase,
   indexes,
 ) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalize today to midnight
+  const tz = process.env.TIMEZONE || "Asia/Colombo";
+  const todayStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const targetDateStr = date.slice(0, 10);
 
-  const targetDate = new Date(date);
-  targetDate.setHours(0, 0, 0, 0);
-
-  if (targetDate < today) {
+  if (targetDateStr < todayStr) {
     throw createHttpError("Cannot edit past availability", 400);
   }
 
@@ -258,13 +268,16 @@ export const deleteAvailabilityTimeslotService = async (
   date,
   phase,
 ) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const tz = process.env.TIMEZONE || "Asia/Colombo";
+  const todayStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const targetDateStr = date.slice(0, 10);
 
-  const targetDate = new Date(date);
-  targetDate.setHours(0, 0, 0, 0);
-
-  if (targetDate < today) {
+  if (targetDateStr < todayStr) {
     throw createHttpError("Cannot delete past availability", 400);
   }
   // Validate phase

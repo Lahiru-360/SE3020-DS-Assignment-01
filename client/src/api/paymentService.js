@@ -12,6 +12,16 @@ export const createPayment = (appointmentId) =>
   axiosInstance.post("/payments/create-intent", { appointmentId });
 
 /**
+ * Manually synchronize payment status with the backend.
+ * Used for local development where webhooks cannot reach localhost.
+ *
+ * @param {string} intentId
+ * @returns {Promise}
+ */
+export const verifyPayment = (intentId) =>
+  axiosInstance.post(`/payments/verify/${intentId}`);
+
+/**
  * Get the logged-in patient's complete transaction history.
  * @returns {Array<Transaction>}
  */

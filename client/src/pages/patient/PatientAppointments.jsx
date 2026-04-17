@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { isPastDate, isSlotElapsed, todayInTZ } from "../../utils/timezone";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import {
@@ -19,6 +20,7 @@ import StatusBadge from "../../components/ui/StatusBadge";
 import FormInput from "../../components/ui/FormInput";
 import StripeCheckout from "../../components/ui/StripeCheckout";
 import TelemedicineButton from "../../components/ui/TelemedicineButton";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -85,12 +87,18 @@ function PaymentStatusBadge({ status }) {
 
 /** Whether the appointment is eligible for payment */
 function canPayAppointment(appt) {
-  return appt.status === "confirmed" && appt.paymentStatus === "unpaid";
+  return (
+    (appt.status === "confirmed" || appt.status === "pending") &&
+    appt.paymentStatus === "unpaid"
+  );
 }
 
 /** Whether the appointment allows retrying a failed payment */
 function canRetryPayment(appt) {
-  return appt.status === "confirmed" && appt.paymentStatus === "failed";
+  return (
+    (appt.status === "confirmed" || appt.status === "pending") &&
+    appt.paymentStatus === "failed"
+  );
 }
 
 //  CloseButton
@@ -669,9 +677,15 @@ function AppointmentDetailModal({
 // ── AppointmentCard ────────────────────────────────────────────────────────
 
 function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
+  const navigate = useNavigate();
   const canCancel = appt.status === "pending" || appt.status === "confirmed";
   const showPay = canPayAppointment(appt) || canRetryPayment(appt);
   const [cardTeleError, setCardTeleError] = useState("");
+
+  const handlePayClick = (e) => {
+    e.stopPropagation();
+    navigate(`/patient/payments?pay=${appt._id}`);
+  };
 
   return (
     <div
@@ -729,10 +743,10 @@ function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
         {showPay && (
           <button
             type="button"
-            onClick={() => onSelect(appt)}
+            onClick={handlePayClick}
             className="px-4 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors"
           >
-            {canRetryPayment(appt) ? "Retry Payment" : "Pay Now"}
+            {canRetryPayment(appt) ? "Retry Payment" : "Pay"}
           </button>
         )}
         {canCancel && (
@@ -793,6 +807,8 @@ export default function PatientAppointments() {
   const [filter, setFilter] = useState("all");
   const [selectedAppt, setSelectedAppt] = useState(null);
   const [cancelling, setCancelling] = useState(null);
+  // Pending-cancel confirmation — holds the appointment ID awaiting user OK
+  const [confirmCancelId, setConfirmCancelId] = useState(null);
 
   // ── Doctor search state ───────────────────────────────────────────────
   const [searchName, setSearchName] = useState("");
@@ -839,43 +855,66 @@ export default function PatientAppointments() {
       );
     } finally {
       setCancelling(null);
+      setConfirmCancelId(null);
     }
   };
 
-  // ── Doctor search handler ─────────────────────────────────────────────
+  // Opens the confirmation dialog instead of cancelling immediately
+  const requestCancel = (id) => setConfirmCancelId(id);
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  // ── Doctor search ─────────────────────────────────────────────────────────
+
+  const loadDoctors = useCallback(async ({ name = "", spec = "" } = {}) => {
     setSearchError("");
-    setHasSearched(true);
     setSearchLoading(true);
     try {
       const res = await searchDoctors({
-        name: searchName.trim() || undefined,
-        specialization: searchSpec.trim() || undefined,
+        name: name.trim() || undefined,
+        specialization: spec.trim() || undefined,
       });
       setDoctors(res.data?.data ?? []);
+      setHasSearched(true);
     } catch (err) {
-      setSearchError(
-        err.response?.data?.message ?? "Failed to search doctors.",
-      );
+      setSearchError(err.response?.data?.message ?? "Failed to load doctors.");
     } finally {
       setSearchLoading(false);
     }
+  }, []);
+
+  // Auto-load all doctors when the tab is first opened
+  useEffect(() => {
+    if (tab === "doctors" && !hasSearched) {
+      loadDoctors();
+    }
+  }, [tab, hasSearched, loadDoctors]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    loadDoctors({ name: searchName, spec: searchSpec });
   };
 
   // ── Derived ──────────────────────────────────────────────────────────
 
+  // Hide expired unpaid appointments (past dates or elapsed today slots)
+  const today = todayInTZ();
+  const visibleAppointments = appointments.filter((a) => {
+    if (a.paymentStatus !== "unpaid") return true;
+    const dateStr = a.date?.slice(0, 10);
+    if (isPastDate(dateStr)) return false; // past date
+    if (dateStr === today && isSlotElapsed(a.timeSlot)) return false; // today, slot gone
+    return true;
+  });
+
   const filtered =
     filter === "all"
-      ? appointments
-      : appointments.filter((a) => a.status === filter);
+      ? visibleAppointments
+      : visibleAppointments.filter((a) => a.status === filter);
 
   const counts = APPT_FILTERS.reduce((acc, f) => {
     acc[f] =
       f === "all"
-        ? appointments.length
-        : appointments.filter((a) => a.status === f).length;
+        ? visibleAppointments.length
+        : visibleAppointments.filter((a) => a.status === f).length;
     return acc;
   }, {});
 
@@ -884,13 +923,24 @@ export default function PatientAppointments() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-xl font-semibold text-text-primary">
-          Appointments
-        </h1>
-        <p className="text-sm text-text-muted mt-0.5">
-          Manage your appointments or find a doctor to book a new one.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-text-primary">
+            Appointments
+          </h1>
+          <p className="text-sm text-text-muted mt-0.5">
+            Manage your appointments or find a doctor to book a new one.
+          </p>
+        </div>
+        {tab === "appointments" && (
+          <button
+            type="button"
+            onClick={() => setTab("doctors")}
+            className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap hidden sm:block"
+          >
+            + Book an Appointment
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -954,14 +1004,14 @@ export default function PatientAppointments() {
               <Loader />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="rounded-xl border border-border bg-bg-card px-6 py-12 text-center">
-              <p className="text-sm text-text-muted">
+            <div className="rounded-xl border border-border bg-bg-card px-6 py-12 flex flex-col items-center justify-center space-y-4">
+              <p className="text-sm text-text-muted text-center max-w-sm">
                 No {filter === "all" ? "" : filter + " "}appointments found.
               </p>
               <button
                 type="button"
                 onClick={() => setTab("doctors")}
-                className="mt-4 px-5 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+                className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity"
               >
                 Find a Doctor
               </button>
@@ -973,7 +1023,7 @@ export default function PatientAppointments() {
                   key={appt._id}
                   appt={appt}
                   onSelect={setSelectedAppt}
-                  onCancel={handleCancel}
+                  onCancel={requestCancel}
                   cancelling={cancelling}
                 />
               ))}
@@ -1026,6 +1076,16 @@ export default function PatientAppointments() {
             <div className="py-10">
               <Loader />
             </div>
+          ) : !hasSearched ? (
+            <div className="rounded-xl border border-border bg-bg-card px-6 py-10 text-center">
+              <p className="text-sm font-semibold text-text-primary mb-1">
+                Find a Doctor
+              </p>
+              <p className="text-sm text-text-muted">
+                Enter a doctor&rsquo;s name or specialization above and press
+                Search.
+              </p>
+            </div>
           ) : hasSearched && doctors.length === 0 ? (
             <div className="rounded-xl border border-border bg-bg-card px-6 py-10 text-center">
               <p className="text-sm text-text-muted">
@@ -1059,11 +1119,24 @@ export default function PatientAppointments() {
           appt={selectedAppt}
           userId={userId}
           onClose={() => setSelectedAppt(null)}
-          onCancel={handleCancel}
+          onCancel={requestCancel}
           cancelling={cancelling}
           onPaymentSuccess={fetchAppointments}
         />
       )}
+
+      {/* Cancel confirmation dialog */}
+      <ConfirmDialog
+        open={!!confirmCancelId}
+        icon="danger"
+        title="Cancel Appointment?"
+        message="This action cannot be undone. The appointment will be cancelled and you may not be able to rebook the same slot."
+        confirmLabel="Yes, Cancel It"
+        cancelLabel="Keep Appointment"
+        loading={cancelling === confirmCancelId}
+        onConfirm={() => handleCancel(confirmCancelId)}
+        onCancel={() => setConfirmCancelId(null)}
+      />
     </div>
   );
 }
