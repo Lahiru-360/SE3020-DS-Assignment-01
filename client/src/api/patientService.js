@@ -3,6 +3,11 @@ import axiosInstance from "./axiosInstance";
 // Patient Profile
 
 /**
+ * Get the patient's own profile.
+ */
+export const getPatientProfile = () => axiosInstance.get("/patients/me");
+
+/**
  * Update the patient's own profile.
  * @param {{ firstName?: string, lastName?: string, phone?: string }} data
  */
