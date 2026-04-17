@@ -93,7 +93,7 @@ function canRetryPayment(appt) {
   return appt.status === "confirmed" && appt.paymentStatus === "failed";
 }
 
-//  CloseButton 
+//  CloseButton
 
 function CloseButton({ onClick }) {
   return (
@@ -158,7 +158,7 @@ function DoctorCard({ doctor, onSelect }) {
   );
 }
 
-//  PrescriptionView 
+//  PrescriptionView
 // Read-only display of a prescription inside the appointment detail modal.
 
 function PrescriptionView({ prescription, onDownload, pdfLoading }) {
@@ -226,7 +226,7 @@ function PrescriptionView({ prescription, onDownload, pdfLoading }) {
   );
 }
 
-//  AppointmentDetailModal 
+//  AppointmentDetailModal
 // Shows full appointment info, cancel option, and prescription (if completed).
 // Manages its own prescription fetch.
 

@@ -66,11 +66,15 @@ function formatTime(timeStr) {
   return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
-// Group availability array [{ date, timeslots[] }] by date
+// Group availability array [{ date, timeslots[] }] by date,
+// filtering out any dates that are strictly before today.
 function groupByDate(availability) {
+  const today = new Date().toISOString().split("T")[0];
   const grouped = {};
   for (const day of availability) {
-    grouped[day.date] = day.timeslots ?? [];
+    if (day.date >= today) {
+      grouped[day.date] = day.timeslots ?? [];
+    }
   }
   return grouped;
 }
@@ -104,7 +108,14 @@ export default function PatientBookingPage() {
   useEffect(() => {
     setLoading(true);
     getDoctorAvailability(doctorId)
-      .then((res) => setAvailability(res.data?.data ?? []))
+      .then((res) => {
+        const data = res.data?.data ?? [];
+        setAvailability(data);
+        // Pre-select today's date if the doctor has availability for it
+        const today = new Date().toISOString().split("T")[0];
+        const hasToday = data.some((d) => d.date === today);
+        if (hasToday) setSelectedDate(today);
+      })
       .catch(() => setError("Could not load doctor availability."))
       .finally(() => setLoading(false));
   }, [doctorId]);

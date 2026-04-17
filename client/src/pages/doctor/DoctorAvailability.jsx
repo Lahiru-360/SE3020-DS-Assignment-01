@@ -496,8 +496,11 @@ export default function DoctorAvailability() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   // Group timeslots by phase within each availability doc
+  const today = new Date().toISOString().split("T")[0];
+
   const renderAvailabilityCard = (avail) => {
     const phases = ["morning", "evening"];
+    const isPast = avail.date < today;
     return (
       <div
         key={avail._id ?? avail.date}
@@ -508,6 +511,11 @@ export default function DoctorAvailability() {
           <span className="ml-2 text-xs font-normal text-text-muted">
             {avail.date}
           </span>
+          {isPast && (
+            <span className="ml-2 inline-block rounded-full px-2 py-0.5 text-xs font-semibold bg-bg-main border border-border text-text-muted">
+              Past · Read-only
+            </span>
+          )}
         </p>
 
         <div className="space-y-3">
@@ -539,16 +547,16 @@ export default function DoctorAvailability() {
                       onClick={() =>
                         openEdit(avail.date, phase, avail.timeslots)
                       }
-                      disabled={isSlotBooked || !!deleting}
-                      className="text-xs font-medium text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+                      disabled={isPast || isSlotBooked || !!deleting}
+                      className="text-xs font-medium text-primary hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(avail.date, phase)}
-                      disabled={isSlotBooked || !!deleting}
-                      className="text-xs font-medium text-error hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+                      disabled={isPast || isSlotBooked || !!deleting}
+                      className="text-xs font-medium text-error hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
                     >
                       {isDeletingThis ? "Removing…" : "Remove"}
                     </button>
