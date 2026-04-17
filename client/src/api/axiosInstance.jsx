@@ -27,8 +27,6 @@ const AUTH_ENDPOINTS = [
   "/auth/login",
   "/auth/register/patient",
   "/auth/register/doctor",
-  "/auth/forgot-password",
-  "/auth/reset-password",
 ];
 
 axiosInstance.interceptors.response.use(
@@ -37,12 +35,11 @@ axiosInstance.interceptors.response.use(
     const url = error.config?.url ?? "";
     const isAuthEndpoint = AUTH_ENDPOINTS.some((path) => url.includes(path));
 
-  
-    const isNetworkDrop = !error.response && (
-      error.code === "ERR_NETWORK" ||
-      error.code === "ERR_EMPTY_RESPONSE" ||
-      error.message === "Network Error"
-    );
+    const isNetworkDrop =
+      !error.response &&
+      (error.code === "ERR_NETWORK" ||
+        error.code === "ERR_EMPTY_RESPONSE" ||
+        error.message === "Network Error");
     if (isNetworkDrop && !error.config._retried) {
       error.config._retried = true;
       return new Promise((resolve) =>

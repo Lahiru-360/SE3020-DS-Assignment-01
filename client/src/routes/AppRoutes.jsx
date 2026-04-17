@@ -2,8 +2,6 @@ import { lazy } from "react";
 
 const Login = lazy(() => import("../pages/Login"));
 const Register = lazy(() => import("../pages/Register"));
-const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
-const ResetPassword = lazy(() => import("../pages/ResetPassword"));
 const Admin = lazy(() => import("../pages/Admin"));
 const NotFound = lazy(() => import("../pages/NotFound"));
 const User = lazy(() => import("../pages/Patient"));
@@ -31,20 +29,6 @@ export const appRoutes = [
   {
     path: "/register",
     component: Register,
-    requiresAuth: false,
-    publicOnly: true,
-    hideChrome: true,
-  },
-  {
-    path: "/forgot-password",
-    component: ForgotPassword,
-    requiresAuth: false,
-    publicOnly: true,
-    hideChrome: true,
-  },
-  {
-    path: "/reset-password",
-    component: ResetPassword,
     requiresAuth: false,
     publicOnly: true,
     hideChrome: true,

@@ -8,14 +8,12 @@ import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 import StatusBadge from "../../components/ui/StatusBadge";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 function formatDate(dateStr) {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("en-US", { dateStyle: "medium" });
 }
 
-// ── CloseButton ────────────────────────────────────────────────────────────
+//  CloseButton
 
 function CloseButton({ onClick }) {
   return (
@@ -43,7 +41,7 @@ function CloseButton({ onClick }) {
   );
 }
 
-// ── PrescriptionDetailModal ────────────────────────────────────────────────
+//  PrescriptionDetailModal
 // Scrollable modal showing full prescription with PDF download.
 
 function PrescriptionDetailModal({ prescription, onClose }) {
@@ -179,7 +177,7 @@ function PrescriptionDetailModal({ prescription, onClose }) {
   );
 }
 
-// ── PrescriptionCard ───────────────────────────────────────────────────────
+//  PrescriptionCard
 
 function PrescriptionCard({ prescription, onSelect }) {
   return (
@@ -219,7 +217,7 @@ function PrescriptionCard({ prescription, onSelect }) {
   );
 }
 
-// ── Main page ──────────────────────────────────────────────────────────────
+//  Main page
 
 export default function PatientPrescriptions() {
   const { userId } = useAuth();

@@ -17,7 +17,7 @@ import {
 import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 
-// ── Nav (mirrors Patient.jsx) ───────────────────────────────────────────────
+//  Nav
 
 const PATIENT_NAV = [
   {
@@ -47,8 +47,6 @@ const PATIENT_NAV = [
   },
 ];
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 function formatSlotDate(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("en-US", {
@@ -67,16 +65,20 @@ function formatTime(timeStr) {
   return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
-// Group availability array [{ date, timeslots[] }] by date
+// Group availability array [{ date, timeslots[] }] by date,
+// filtering out any dates that are strictly before today.
 function groupByDate(availability) {
+  const today = new Date().toISOString().split("T")[0];
   const grouped = {};
   for (const day of availability) {
-    grouped[day.date] = day.timeslots ?? [];
+    if (day.date >= today) {
+      grouped[day.date] = day.timeslots ?? [];
+    }
   }
   return grouped;
 }
 
-// ── Main page ──────────────────────────────────────────────────────────────
+//  Main page
 
 export default function PatientBookingPage() {
   const { doctorId } = useParams();
@@ -105,7 +107,14 @@ export default function PatientBookingPage() {
   useEffect(() => {
     setLoading(true);
     getDoctorAvailability(doctorId)
-      .then((res) => setAvailability(res.data?.data ?? []))
+      .then((res) => {
+        const data = res.data?.data ?? [];
+        setAvailability(data);
+        // Pre-select today's date if the doctor has availability for it
+        const today = new Date().toISOString().split("T")[0];
+        const hasToday = data.some((d) => d.date === today);
+        if (hasToday) setSelectedDate(today);
+      })
       .catch(() => setError("Could not load doctor availability."))
       .finally(() => setLoading(false));
   }, [doctorId]);
@@ -116,7 +125,7 @@ export default function PatientBookingPage() {
     .filter((d) => !isPastDate(d))
     .sort();
 
-  // Toggle slot selection — clicking the same slot deselects it
+  // clicking the same slot deselects it
   const handleSlotClick = (date, slot) => {
     if (slot.isBooked) return;
     const alreadySelected =
@@ -167,7 +176,7 @@ export default function PatientBookingPage() {
   return (
     <DashboardLayout navItems={PATIENT_NAV}>
       <div className="max-w-3xl mx-auto space-y-6">
-        {/* ── Page header ─────────────────────────────────────────────── */}
+        {/*  Page header  */}
         <div className="flex items-start gap-3">
           <button
             type="button"
@@ -191,7 +200,7 @@ export default function PatientBookingPage() {
           </div>
         </div>
 
-        {/* ── Doctor info banner ───────────────────────────────────────── */}
+        {/*  Doctor info banner  */}
         {doctor && (
           <div className="rounded-xl border border-border bg-bg-card px-5 py-4 flex items-center justify-between gap-4">
             <div>
@@ -215,7 +224,7 @@ export default function PatientBookingPage() {
           </div>
         )}
 
-        {/* ── Availability content ─────────────────────────────────────── */}
+        {/*  Availability content  */}
         {loading ? (
           <div className="py-20">
             <Loader />

@@ -136,14 +136,6 @@ function Login() {
               placeholder="••••••••"
               required
               autoComplete="current-password"
-              rightElement={
-                <Link
-                  to="/forgot-password"
-                  className="text-sm text-accent hover:opacity-70 transition"
-                >
-                  Forgot password?
-                </Link>
-              }
             />
 
             <button

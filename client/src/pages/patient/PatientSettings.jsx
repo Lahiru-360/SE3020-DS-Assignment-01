@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/useAuth";
-import { getPatientProfile, updatePatientProfile } from "../../api/patientService";
+import {
+  getPatientProfile,
+  updatePatientProfile,
+} from "../../api/patientService";
 import FormInput from "../../components/ui/FormInput";
 import Alert from "../../components/ui/Alert";
 import Loader from "../../components/ui/Loader";
-
-// ── Constants ──────────────────────────────────────────────────────────────
 
 const INITIAL_FORM = {
   firstName: "",
@@ -13,20 +14,24 @@ const INITIAL_FORM = {
   phone: "",
 };
 
-// ── Component ──────────────────────────────────────────────────────────────
+//  Component
 
 export default function PatientSettings() {
   const { userId, userEmail } = useAuth();
 
   const [form, setForm] = useState(INITIAL_FORM);
-  const [savedProfile, setSavedProfile] = useState({ firstName: "", lastName: "", phone: "" });
+  const [savedProfile, setSavedProfile] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // ── Load profile on mount ────────────────────────────────────────────────
+  //  Load profile on mount
 
   useEffect(() => {
     setLoading(true);
@@ -42,14 +47,19 @@ export default function PatientSettings() {
         setSavedProfile(profile);
       })
       .catch((err) => {
-        const msg = err?.response?.data?.message ?? err?.message ?? "Unknown error";
-        console.error("[PatientSettings] Failed to load profile:", err?.response?.status, msg);
+        const msg =
+          err?.response?.data?.message ?? err?.message ?? "Unknown error";
+        console.error(
+          "[PatientSettings] Failed to load profile:",
+          err?.response?.status,
+          msg,
+        );
         setError(`Could not load your profile: ${msg}`);
       })
       .finally(() => setLoading(false));
   }, []);
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  //  Handlers
 
   const handleChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -58,12 +68,12 @@ export default function PatientSettings() {
     }
   };
 
-  // ── Validation ─────────────────────────────────────────────────────────
+  //  Validation
 
   const validate = () => {
     const errs = {};
     const nameRe = /^[a-zA-Z\s'-]+$/;
-    const phoneRe = /^\+?[\d\s-]{7,15}$/;
+    const phoneRe = /^\d{10}$/;
 
     if (form.firstName) {
       if (!nameRe.test(form.firstName))
@@ -80,13 +90,13 @@ export default function PatientSettings() {
         errs.lastName = "Last name must not exceed 50 characters.";
     }
     if (form.phone && !phoneRe.test(form.phone)) {
-      errs.phone = "Enter a valid phone number (7–15 digits).";
+      errs.phone = "Enter a valid 10-digit phone number.";
     }
 
     return errs;
   };
 
-  // ── Submit ─────────────────────────────────────────────────────────────
+  //  Submit
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -129,8 +139,6 @@ export default function PatientSettings() {
     }
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────
-
   if (loading) {
     return (
       <div className="py-20">
@@ -161,16 +169,22 @@ export default function PatientSettings() {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="text-xs text-text-muted mb-0.5">First Name</p>
-            <p className="text-sm text-text-primary">{savedProfile.firstName || "—"}</p>
+            <p className="text-sm text-text-primary">
+              {savedProfile.firstName || "—"}
+            </p>
           </div>
           <div>
             <p className="text-xs text-text-muted mb-0.5">Last Name</p>
-            <p className="text-sm text-text-primary">{savedProfile.lastName || "—"}</p>
+            <p className="text-sm text-text-primary">
+              {savedProfile.lastName || "—"}
+            </p>
           </div>
         </div>
         <div>
           <p className="text-xs text-text-muted mb-0.5">Phone</p>
-          <p className="text-sm text-text-primary">{savedProfile.phone || "—"}</p>
+          <p className="text-sm text-text-primary">
+            {savedProfile.phone || "—"}
+          </p>
         </div>
         <div className="border-t border-border pt-3">
           <p className="text-xs text-text-muted mb-0.5">Email</p>

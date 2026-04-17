@@ -13,8 +13,6 @@ import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 import StripeCheckout from "../../components/ui/StripeCheckout";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 function formatDate(dateStr) {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -28,7 +26,7 @@ function formatAmount(amount, currency = "LKR") {
   return `${currency} ${Number(amount).toLocaleString("en-LK")}`;
 }
 
-// ── Status badge ────────────────────────────────────────────────────────────
+//  Status badge
 
 const TX_STATUS = {
   initiated: {
@@ -72,7 +70,7 @@ function TxStatusBadge({ status }) {
   );
 }
 
-// ── Pay Modal ───────────────────────────────────────────────────────────────
+//  Pay Modal
 
 function PayModal({ appointments, onClose, onSuccess, initialId }) {
   const [appointmentId, setAppointmentId] = useState(initialId || "");
@@ -204,7 +202,7 @@ function PayModal({ appointments, onClose, onSuccess, initialId }) {
   );
 }
 
-// ── Component ──────────────────────────────────────────────────────────────
+//  Component
 
 export default function PatientPayments() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -408,4 +406,3 @@ export default function PatientPayments() {
     </div>
   );
 }
-

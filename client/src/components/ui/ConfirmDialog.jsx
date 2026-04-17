@@ -21,7 +21,15 @@ const ICON_CONFIG = {
     border: "var(--color-error, #e74c3c)",
     color: "var(--color-error, #e74c3c)",
     svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="w-6 h-6"
+      >
         <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
         <line x1="12" y1="9" x2="12" y2="13" />
         <line x1="12" y1="17" x2="12.01" y2="17" />
@@ -33,7 +41,15 @@ const ICON_CONFIG = {
     border: "var(--color-warning, #f4a732)",
     color: "var(--color-warning, #f4a732)",
     svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="w-6 h-6"
+      >
         <circle cx="12" cy="12" r="10" />
         <line x1="12" y1="8" x2="12" y2="12" />
         <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -45,7 +61,15 @@ const ICON_CONFIG = {
     border: "var(--color-primary, #3b82f6)",
     color: "var(--color-primary, #3b82f6)",
     svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="w-6 h-6"
+      >
         <circle cx="12" cy="12" r="10" />
         <line x1="12" y1="16" x2="12" y2="12" />
         <line x1="12" y1="8" x2="12.01" y2="8" />
@@ -75,7 +99,9 @@ export default function ConfirmDialog({
   // Close on Escape key
   useEffect(() => {
     if (!open) return;
-    const handler = (e) => { if (e.key === "Escape" && !loading) onCancel?.(); };
+    const handler = (e) => {
+      if (e.key === "Escape" && !loading) onCancel?.();
+    };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [open, loading, onCancel]);
@@ -90,7 +116,9 @@ export default function ConfirmDialog({
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center px-4"
       style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
-      onClick={(e) => { if (e.target === e.currentTarget && !loading) onCancel?.(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !loading) onCancel?.();
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
@@ -161,9 +189,25 @@ export default function ConfirmDialog({
             }}
           >
             {loading && (
-              <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
-                <path d="M12 2a10 10 0 010 20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              <svg
+                className="animate-spin w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeOpacity="0.25"
+                />
+                <path
+                  d="M12 2a10 10 0 010 20"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
               </svg>
             )}
             {loading ? "Processing…" : confirmLabel}
