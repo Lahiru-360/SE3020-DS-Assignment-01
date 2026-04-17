@@ -15,6 +15,7 @@ import StatusBadge from "../../components/ui/StatusBadge";
 import FormInput from "../../components/ui/FormInput";
 import StripeCheckout from "../../components/ui/StripeCheckout";
 import TelemedicineButton from "../../components/ui/TelemedicineButton";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -648,6 +649,8 @@ export default function PatientAppointments() {
   const [filter, setFilter] = useState("all");
   const [selectedAppt, setSelectedAppt] = useState(null);
   const [cancelling, setCancelling] = useState(null);
+  // Pending-cancel confirmation — holds the appointment ID awaiting user OK
+  const [confirmCancelId, setConfirmCancelId] = useState(null);
 
   // ── Doctor search state ───────────────────────────────────────────────
   const [searchName, setSearchName] = useState("");
@@ -694,8 +697,12 @@ export default function PatientAppointments() {
       );
     } finally {
       setCancelling(null);
+      setConfirmCancelId(null);
     }
   };
+
+  // Opens the confirmation dialog instead of cancelling immediately
+  const requestCancel = (id) => setConfirmCancelId(id);
 
   // ── Doctor search handler ─────────────────────────────────────────────
 
@@ -841,7 +848,7 @@ export default function PatientAppointments() {
                   key={appt._id}
                   appt={appt}
                   onSelect={setSelectedAppt}
-                  onCancel={handleCancel}
+                  onCancel={requestCancel}
                   cancelling={cancelling}
                 />
               ))}
@@ -927,11 +934,24 @@ export default function PatientAppointments() {
           appt={selectedAppt}
           userId={userId}
           onClose={() => setSelectedAppt(null)}
-          onCancel={handleCancel}
+          onCancel={requestCancel}
           cancelling={cancelling}
           onPaymentSuccess={fetchAppointments}
         />
       )}
+
+      {/* Cancel confirmation dialog */}
+      <ConfirmDialog
+        open={!!confirmCancelId}
+        icon="danger"
+        title="Cancel Appointment?"
+        message="This action cannot be undone. The appointment will be cancelled and you may not be able to rebook the same slot."
+        confirmLabel="Yes, Cancel It"
+        cancelLabel="Keep Appointment"
+        loading={cancelling === confirmCancelId}
+        onConfirm={() => handleCancel(confirmCancelId)}
+        onCancel={() => setConfirmCancelId(null)}
+      />
     </div>
   );
 }

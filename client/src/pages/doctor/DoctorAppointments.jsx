@@ -13,6 +13,7 @@ import Alert from "../../components/ui/Alert";
 import StatusBadge from "../../components/ui/StatusBadge";
 import TelemedicineButton from "../../components/ui/TelemedicineButton";
 import PrescriptionForm from "./PrescriptionForm";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -618,6 +619,8 @@ export default function DoctorAppointments() {
   const [success, setSuccess] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const [acting, setActing] = useState(null);
+  // Holds { id, action, label } while awaiting doctor's confirmation
+  const [confirmAction, setConfirmAction] = useState(null);
 
   // Detail modal
   const [selectedAppt, setSelectedAppt] = useState(null);
@@ -664,7 +667,16 @@ export default function DoctorAppointments() {
       setError(err.response?.data?.message ?? "Failed to update appointment.");
     } finally {
       setActing(null);
+      setConfirmAction(null);
     }
+  };
+
+  // Opens the confirmation dialog; actual action fires only after doctor confirms
+  const requestAction = (id, action, apptStatus) => {
+    const label = action === "cancel"
+      ? (apptStatus === "pending" ? "Reject" : "Cancel")
+      : action === "confirmed" ? "Accept" : "Mark Complete";
+    setConfirmAction({ id, action, label, apptStatus });
   };
 
   // ── Derived ──────────────────────────────────────────────────────────────
@@ -752,7 +764,7 @@ export default function DoctorAppointments() {
             <AppointmentCard
               key={appt._id}
               appt={appt}
-              onAction={handleAction}
+              onAction={(id, action) => requestAction(id, action, appt.status)}
               acting={acting}
               onSelect={setSelectedAppt}
             />
@@ -766,10 +778,31 @@ export default function DoctorAppointments() {
           appt={selectedAppt}
           userId={userId}
           onClose={() => setSelectedAppt(null)}
-          onAction={handleAction}
+          onAction={(id, action) => requestAction(id, action, selectedAppt.status)}
           acting={acting}
         />
       )}
+
+      {/* Cancel / Reject confirmation dialog */}
+      <ConfirmDialog
+        open={!!confirmAction && (confirmAction.action === "cancel")}
+        icon="danger"
+        title={
+          confirmAction?.apptStatus === "pending"
+            ? "Reject this Appointment?"
+            : "Cancel this Appointment?"
+        }
+        message={
+          confirmAction?.apptStatus === "pending"
+            ? "The appointment request will be rejected and the patient will be notified."
+            : "The confirmed appointment will be cancelled. The patient will be notified."
+        }
+        confirmLabel={confirmAction?.apptStatus === "pending" ? "Yes, Reject" : "Yes, Cancel"}
+        cancelLabel="Keep It"
+        loading={acting === confirmAction?.id}
+        onConfirm={() => handleAction(confirmAction.id, confirmAction.action)}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   );
 }

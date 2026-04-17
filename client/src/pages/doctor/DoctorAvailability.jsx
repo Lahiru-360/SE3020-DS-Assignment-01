@@ -9,6 +9,7 @@ import {
 } from "../../api/doctorService";
 import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
 
 // ── Time constants (mirrors backend availabilityService.js) ───────────────
 
@@ -409,8 +410,10 @@ export default function DoctorAvailability() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  // Delete confirmation
-  const [deleting, setDeleting] = useState(null); // null | {date, phase}
+  // Delete in-progress state: null | {date, phase}
+  const [deleting, setDeleting] = useState(null);
+  // Pending removal awaiting doctor confirmation: null | {date, phase}
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   // ── Fetch ────────────────────────────────────────────────────────────────
 
@@ -486,8 +489,12 @@ export default function DoctorAvailability() {
       setError(err.response?.data?.message ?? "Failed to delete slot.");
     } finally {
       setDeleting(null);
+      setPendingDelete(null);
     }
   };
+
+  // Asks for confirmation before deleting
+  const requestDelete = (date, phase) => setPendingDelete({ date, phase });
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -540,7 +547,7 @@ export default function DoctorAvailability() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDelete(avail.date, phase)}
+                      onClick={() => requestDelete(avail.date, phase)}
                       disabled={!!deleting}
                       className="text-xs font-medium text-error hover:underline disabled:opacity-50"
                     >
@@ -645,6 +652,19 @@ export default function DoctorAvailability() {
           saveError={saveError}
         />
       )}
+
+      {/* Remove availability confirmation dialog */}
+      <ConfirmDialog
+        open={!!pendingDelete}
+        icon="warning"
+        title="Remove Availability Slot?"
+        message={`This will permanently remove the ${pendingDelete?.phase} slots for ${pendingDelete?.date}. Any unbooked slots will be deleted. Already-booked appointments are not affected.`}
+        confirmLabel="Yes, Remove"
+        cancelLabel="Keep It"
+        loading={!!deleting}
+        onConfirm={() => handleDelete(pendingDelete.date, pendingDelete.phase)}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }
