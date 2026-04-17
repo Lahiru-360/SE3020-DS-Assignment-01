@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { isPastDate, isSlotElapsed, todayInTZ } from "../../utils/timezone";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import {
@@ -720,16 +721,29 @@ export default function PatientAppointments() {
 
   // ── Derived ──────────────────────────────────────────────────────────
 
+  // Hide unpaid appointments that are no longer actionable:
+  //   • Past date  — slot is gone, nothing to pay or cancel
+  //   • Today but time slot already elapsed — same reason
+  // Future/upcoming unpaid appointments are kept so the patient can still pay.
+  const today = todayInTZ();
+  const visibleAppointments = appointments.filter((a) => {
+    if (a.paymentStatus !== "unpaid") return true;
+    const dateStr = a.date?.slice(0, 10);
+    if (isPastDate(dateStr)) return false;          // past date
+    if (dateStr === today && isSlotElapsed(a.timeSlot)) return false; // today, slot gone
+    return true;
+  });
+
   const filtered =
     filter === "all"
-      ? appointments
-      : appointments.filter((a) => a.status === filter);
+      ? visibleAppointments
+      : visibleAppointments.filter((a) => a.status === filter);
 
   const counts = APPT_FILTERS.reduce((acc, f) => {
     acc[f] =
       f === "all"
-        ? appointments.length
-        : appointments.filter((a) => a.status === f).length;
+        ? visibleAppointments.length
+        : visibleAppointments.filter((a) => a.status === f).length;
     return acc;
   }, {});
 

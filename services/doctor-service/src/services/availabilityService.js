@@ -54,9 +54,7 @@ const isWithinPhase = (indexes, phase) => {
 };
 
 export const addAvailabilityService = async (doctorId, date, slots) => {
-  // Validate that the date is within the next 7 days.
-  // Use the configured timezone (TIMEZONE env var, default Asia/Colombo) so
-  // that "today" is correct regardless of the server's OS timezone.
+  // Enforce 0-7 day range using the configured app timezone.
   const tz = process.env.TIMEZONE || "Asia/Colombo";
   const todayStr = new Intl.DateTimeFormat("en-CA", {
     timeZone: tz,
