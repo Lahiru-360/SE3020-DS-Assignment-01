@@ -9,6 +9,7 @@ export default function FormInput({
   rightElement,
   autoComplete,
   error,
+  maxLength,
 }) {
   return (
     <div>
@@ -30,6 +31,7 @@ export default function FormInput({
         onChange={onChange}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        maxLength={maxLength}
         className="
           w-full px-4 py-2.5 rounded-lg text-sm
           bg-bg-main

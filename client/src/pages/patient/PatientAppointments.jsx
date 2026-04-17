@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { isPastDate, isSlotElapsed, todayInTZ } from "../../utils/timezone";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
@@ -9,6 +9,12 @@ import {
   getPatientPrescriptions,
   downloadPrescriptionPdf,
 } from "../../api/patientService";
+import {
+  uploadRecord,
+  getMyRecords,
+  getRecordSignedUrl,
+  deleteRecord,
+} from "../../api/recordService";
 import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 import StatusBadge from "../../components/ui/StatusBadge";
@@ -16,8 +22,6 @@ import FormInput from "../../components/ui/FormInput";
 import StripeCheckout from "../../components/ui/StripeCheckout";
 import TelemedicineButton from "../../components/ui/TelemedicineButton";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 function formatDate(dateStr) {
   if (!dateStr) return "—";
@@ -34,7 +38,7 @@ function formatShortDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("en-US", { dateStyle: "medium" });
 }
 
-// ── PaymentStatusBadge ─────────────────────────────────────────────────────
+//  PaymentStatusBadge
 
 const PAYMENT_STATUS_STYLES = {
   unpaid: {
@@ -80,7 +84,7 @@ function PaymentStatusBadge({ status }) {
   );
 }
 
-/** Whether the appointment is eligible for payment */
+//Whether the appointment is eligible for payment
 function canPayAppointment(appt) {
   return (
     (appt.status === "confirmed" || appt.status === "pending") &&
@@ -88,7 +92,7 @@ function canPayAppointment(appt) {
   );
 }
 
-/** Whether the appointment allows retrying a failed payment */
+//Whether the appointment allows retrying a failed payment
 function canRetryPayment(appt) {
   return (
     (appt.status === "confirmed" || appt.status === "pending") &&
@@ -96,7 +100,7 @@ function canRetryPayment(appt) {
   );
 }
 
-// ── CloseButton ────────────────────────────────────────────────────────────
+// CloseButton
 
 function CloseButton({ onClick }) {
   return (
@@ -124,8 +128,7 @@ function CloseButton({ onClick }) {
   );
 }
 
-// ── DoctorCard ─────────────────────────────────────────────────────────────
-// Displays a doctor from search results. Clicking opens the booking modal.
+//  DoctorCard
 
 function DoctorCard({ doctor, onSelect }) {
   return (
@@ -161,8 +164,7 @@ function DoctorCard({ doctor, onSelect }) {
   );
 }
 
-// ── PrescriptionView ───────────────────────────────────────────────────────
-// Read-only display of a prescription inside the appointment detail modal.
+//  PrescriptionView
 
 function PrescriptionView({ prescription, onDownload, pdfLoading }) {
   return (
@@ -229,9 +231,7 @@ function PrescriptionView({ prescription, onDownload, pdfLoading }) {
   );
 }
 
-// ── AppointmentDetailModal ─────────────────────────────────────────────────
-// Shows full appointment info, cancel option, and prescription (if completed).
-// Manages its own prescription fetch.
+//  AppointmentDetailModal
 
 function AppointmentDetailModal({
   appt,
@@ -242,6 +242,7 @@ function AppointmentDetailModal({
   onPaymentSuccess,
 }) {
   const isCompleted = appt.status === "completed";
+  const isConfirmed = appt.status === "confirmed";
   const isVirtualConfirmed =
     appt.type === "VIRTUAL" && appt.status === "confirmed";
 
@@ -259,6 +260,17 @@ function AppointmentDetailModal({
   // Telemedicine state
   const [teleError, setTeleError] = useState("");
 
+  // Medical records state
+  const [records, setRecords] = useState(null);
+  const [recordsLoading, setRecordsLoading] = useState(isConfirmed);
+  const [recordsError, setRecordsError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [uploadSuccess, setUploadSuccess] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null); // {_id, fileName}
+  const [deleting, setDeleting] = useState(false);
+  const fileInputRef = useRef(null);
+
   const showPayBtn =
     !paymentDone && (canPayAppointment(appt) || canRetryPayment(appt));
 
@@ -274,6 +286,15 @@ function AppointmentDetailModal({
       .catch(() => setPrescError("Failed to load prescription."))
       .finally(() => setPrescLoading(false));
   }, [isCompleted, userId, appt._id]);
+
+  // Fetch medical records on mount (confirmed appointments only)
+  useEffect(() => {
+    if (!isConfirmed) return;
+    getMyRecords()
+      .then((res) => setRecords(res.data?.data ?? []))
+      .catch(() => setRecordsError("Failed to load medical records."))
+      .finally(() => setRecordsLoading(false));
+  }, [isConfirmed]);
 
   const handleDownloadPdf = async () => {
     if (!prescription || prescription === "none") return;
@@ -294,6 +315,69 @@ function AppointmentDetailModal({
       setPdfError("Failed to download PDF. Please try again.");
     } finally {
       setPdfLoading(false);
+    }
+  };
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      setUploadError("Only PDF files are allowed.");
+      e.target.value = "";
+      return;
+    }
+    setUploading(true);
+    setUploadError("");
+    setUploadSuccess("");
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await uploadRecord(formData);
+      setRecords((prev) => [res.data?.data, ...(prev ?? [])]);
+      setUploadSuccess("Record uploaded successfully.");
+    } catch (err) {
+      setUploadError(
+        err.response?.data?.message ?? "Upload failed. Please try again.",
+      );
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleDownloadRecord = async (reportId, fileName) => {
+    setRecordsError("");
+    try {
+      const res = await getRecordSignedUrl(reportId);
+      const url = res.data?.data?.url;
+      if (!url) throw new Error("No URL returned");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      setRecordsError("Failed to download record. Please try again.");
+    }
+  };
+
+  const handleDeleteRecord = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setRecordsError("");
+    try {
+      await deleteRecord(deleteTarget._id);
+      setRecords((prev) => prev.filter((r) => r._id !== deleteTarget._id));
+    } catch (err) {
+      setRecordsError(
+        err.response?.data?.message ??
+          "Failed to delete record. Please try again.",
+      );
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -372,7 +456,7 @@ function AppointmentDetailModal({
             </p>
           </div>
 
-          {/* Virtual Consultation section — confirmed VIRTUAL appointments only */}
+          {/* Virtual Consultation section*/}
           {isVirtualConfirmed && (
             <div className="border-t border-border pt-5 space-y-3">
               <div className="flex items-center gap-2">
@@ -522,13 +606,133 @@ function AppointmentDetailModal({
               )}
             </div>
           )}
+
+          {/* Medical Records section — confirmed appointments, patient only */}
+          {isConfirmed && (
+            <div className="border-t border-border pt-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-semibold text-text-primary">
+                  Medical Records
+                </p>
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                >
+                  {uploading ? "Uploading…" : "+ Upload PDF"}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+              </div>
+
+              {uploadError && <Alert type="error">{uploadError}</Alert>}
+              {uploadSuccess && <Alert type="success">{uploadSuccess}</Alert>}
+              {recordsError && <Alert type="error">{recordsError}</Alert>}
+
+              {recordsLoading ? (
+                <div className="py-6">
+                  <Loader />
+                </div>
+              ) : records?.length === 0 ? (
+                <div className="rounded-lg bg-bg-main border border-border px-4 py-6 text-center">
+                  <p className="text-sm text-text-muted">
+                    No medical records uploaded yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {records?.map((r) => (
+                    <div
+                      key={r._id}
+                      className="rounded-lg bg-bg-main border border-border px-4 py-3 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-text-primary truncate">
+                          {r.fileName}
+                        </p>
+                        {r.description && (
+                          <p className="text-xs text-text-muted truncate">
+                            {r.description}
+                          </p>
+                        )}
+                        <p className="text-xs text-text-muted mt-0.5">
+                          {new Date(r.createdAt).toLocaleDateString("en-US", {
+                            dateStyle: "medium",
+                          })}
+                          {r.fileSize
+                            ? ` · ${(r.fileSize / 1024).toFixed(0)} KB`
+                            : ""}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleDownloadRecord(r._id, r.fileName)
+                          }
+                          className="px-3 py-1.5 rounded-lg border border-primary text-primary text-xs font-semibold hover:bg-bg-card transition-colors"
+                        >
+                          Download
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDeleteTarget({
+                              _id: r._id,
+                              fileName: r.fileName,
+                            })
+                          }
+                          className="p-1.5 rounded-lg border border-border text-error hover:bg-error/10 transition-colors"
+                          aria-label="Delete record"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Delete medical record confirmation */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        icon="danger"
+        title="Delete Medical Record?"
+        message={`"${deleteTarget?.fileName}" will be permanently deleted and cannot be recovered.`}
+        confirmLabel="Delete"
+        cancelLabel="Keep It"
+        loading={deleting}
+        onConfirm={handleDeleteRecord}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
 
-// ── AppointmentCard ────────────────────────────────────────────────────────
+//  AppointmentCard
 
 function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
   const navigate = useNavigate();
@@ -633,7 +837,7 @@ function AppointmentCard({ appt, onSelect, onCancel, cancelling }) {
   );
 }
 
-// ── Constants ──────────────────────────────────────────────────────────────
+//  Constants
 
 const TABS = ["appointments", "doctors"];
 const APPT_FILTERS = ["all", "pending", "confirmed", "completed", "cancelled"];
@@ -645,15 +849,15 @@ const FILTER_LABELS = {
   cancelled: "Cancelled",
 };
 
-// ── Main page ──────────────────────────────────────────────────────────────
+//  Main page
 
 export default function PatientAppointments() {
   const { userId } = useAuth();
 
-  // ── Tab state ─────────────────────────────────────────────────────────
+  //  Tab state
   const [tab, setTab] = useState("appointments");
 
-  // ── Appointments state ────────────────────────────────────────────────
+  //  Appointments state
   const [appointments, setAppointments] = useState([]);
   const [apptLoading, setApptLoading] = useState(true);
   const [apptError, setApptError] = useState("");
@@ -664,7 +868,7 @@ export default function PatientAppointments() {
   // Pending-cancel confirmation — holds the appointment ID awaiting user OK
   const [confirmCancelId, setConfirmCancelId] = useState(null);
 
-  // ── Doctor search state ───────────────────────────────────────────────
+  //  Doctor search state
   const [searchName, setSearchName] = useState("");
   const [searchSpec, setSearchSpec] = useState("");
   const [doctors, setDoctors] = useState([]);
@@ -674,7 +878,7 @@ export default function PatientAppointments() {
 
   const navigate = useNavigate();
 
-  // ── Fetch appointments ────────────────────────────────────────────────
+  //  Fetch appointments
 
   const fetchAppointments = useCallback(() => {
     setApptLoading(true);
@@ -692,7 +896,7 @@ export default function PatientAppointments() {
     fetchAppointments();
   }, [fetchAppointments]);
 
-  // ── Cancel handler ────────────────────────────────────────────────────
+  //  Cancel handler
 
   const handleCancel = async (id) => {
     setCancelling(id);
@@ -716,7 +920,7 @@ export default function PatientAppointments() {
   // Opens the confirmation dialog instead of cancelling immediately
   const requestCancel = (id) => setConfirmCancelId(id);
 
-  // ── Doctor search ─────────────────────────────────────────────────────────
+  //  Doctor search
 
   const loadDoctors = useCallback(async ({ name = "", spec = "" } = {}) => {
     setSearchError("");
@@ -729,9 +933,7 @@ export default function PatientAppointments() {
       setDoctors(res.data?.data ?? []);
       setHasSearched(true);
     } catch (err) {
-      setSearchError(
-        err.response?.data?.message ?? "Failed to load doctors.",
-      );
+      setSearchError(err.response?.data?.message ?? "Failed to load doctors.");
     } finally {
       setSearchLoading(false);
     }
@@ -749,14 +951,14 @@ export default function PatientAppointments() {
     loadDoctors({ name: searchName, spec: searchSpec });
   };
 
-  // ── Derived ──────────────────────────────────────────────────────────
+  //  Derived state
 
   // Hide expired unpaid appointments (past dates or elapsed today slots)
   const today = todayInTZ();
   const visibleAppointments = appointments.filter((a) => {
     if (a.paymentStatus !== "unpaid") return true;
     const dateStr = a.date?.slice(0, 10);
-    if (isPastDate(dateStr)) return false;          // past date
+    if (isPastDate(dateStr)) return false; // past date
     if (dateStr === today && isSlotElapsed(a.timeSlot)) return false; // today, slot gone
     return true;
   });
@@ -774,7 +976,7 @@ export default function PatientAppointments() {
     return acc;
   }, {});
 
-  // ── Render ────────────────────────────────────────────────────────────
+  //  Render
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -818,7 +1020,7 @@ export default function PatientAppointments() {
         ))}
       </div>
 
-      {/* ── MY APPOINTMENTS TAB ──────────────────────────────────────── */}
+      {/*  MY APPOINTMENTS TAB  */}
       {tab === "appointments" && (
         <div className="space-y-5">
           {apptError && <Alert type="error">{apptError}</Alert>}
@@ -888,7 +1090,7 @@ export default function PatientAppointments() {
         </div>
       )}
 
-      {/* ── FIND A DOCTOR TAB ────────────────────────────────────────── */}
+      {/*  FIND A DOCTOR TAB  */}
       {tab === "doctors" && (
         <div className="space-y-5">
           {searchError && <Alert type="error">{searchError}</Alert>}
@@ -934,9 +1136,12 @@ export default function PatientAppointments() {
             </div>
           ) : !hasSearched ? (
             <div className="rounded-xl border border-border bg-bg-card px-6 py-10 text-center">
-              <p className="text-sm font-semibold text-text-primary mb-1">Find a Doctor</p>
+              <p className="text-sm font-semibold text-text-primary mb-1">
+                Find a Doctor
+              </p>
               <p className="text-sm text-text-muted">
-                Enter a doctor&rsquo;s name or specialization above and press Search.
+                Enter a doctor&rsquo;s name or specialization above and press
+                Search.
               </p>
             </div>
           ) : hasSearched && doctors.length === 0 ? (

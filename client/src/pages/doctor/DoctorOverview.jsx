@@ -9,8 +9,6 @@ import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 import StatusBadge from "../../components/ui/StatusBadge";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 function formatDate(dateStr) {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -20,7 +18,7 @@ function formatDate(dateStr) {
   });
 }
 
-// ── Stat card ──────────────────────────────────────────────────────────────
+//  Stat card
 
 function StatCard({ label, value, accent }) {
   return (
@@ -36,7 +34,7 @@ function StatCard({ label, value, accent }) {
   );
 }
 
-// ── Component ──────────────────────────────────────────────────────────────
+// Component
 
 export default function DoctorOverview() {
   const { userEmail, userId } = useAuth();
@@ -62,7 +60,6 @@ export default function DoctorOverview() {
       .finally(() => setLoading(false));
   }, [userId]);
 
-  // ── Derived stats ──────────────────────────────────────────────────────
   const stats = {
     total: appointments.length,
     pending: appointments.filter((a) => a.status === "pending").length,
@@ -84,7 +81,7 @@ export default function DoctorOverview() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      {/* ── Welcome banner ──────────────────────────────────── */}
+      {/*  Welcome banner  */}
       <div className="rounded-xl bg-bg-card border border-border px-6 py-5">
         <h1 className="text-xl font-semibold text-text-primary">
           Welcome back, Doctor
@@ -92,10 +89,9 @@ export default function DoctorOverview() {
         <p className="text-sm text-text-muted mt-0.5">{userEmail}</p>
       </div>
 
-      {/* ── Feedback ────────────────────────────────────────── */}
       {error && <Alert type="error">{error}</Alert>}
 
-      {/* ── Stats ───────────────────────────────────────────── */}
+      {/*  Stats  */}
       {loading ? (
         <div className="py-16">
           <Loader />
@@ -125,7 +121,7 @@ export default function DoctorOverview() {
             />
           </div>
 
-          {/* ── Upcoming appointments ──────────────────────── */}
+          {/*  Upcoming appointments  */}
           <section>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold text-text-primary">
@@ -172,7 +168,7 @@ export default function DoctorOverview() {
             )}
           </section>
 
-          {/* ── Availability summary ───────────────────────── */}
+          {/*  Availability summary  */}
           <section>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold text-text-primary">

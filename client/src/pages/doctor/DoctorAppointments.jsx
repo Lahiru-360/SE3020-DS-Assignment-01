@@ -8,6 +8,10 @@ import {
   downloadPrescriptionPdf,
 } from "../../api/doctorService";
 import { endSession } from "../../api/telemedicineService";
+import {
+  getPatientRecordsForDoctor,
+  getPatientRecordSignedUrlForDoctor,
+} from "../../api/recordService";
 import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 import StatusBadge from "../../components/ui/StatusBadge";
@@ -43,10 +47,6 @@ const FILTER_LABELS = {
   cancelled: "Cancelled",
 };
 
-// Actions available per status.
-// "confirm" → PATCH /status {status:"confirmed"} (Accept)
-// "complete" → PATCH /status {status:"completed"}
-// "cancel"   → PATCH /cancel  (Reject when pending; Cancel when confirmed)
 const ACTIONS = {
   pending: ["confirm", "cancel"],
   confirmed: ["complete", "cancel"],
@@ -54,7 +54,7 @@ const ACTIONS = {
   cancelled: [],
 };
 
-// ── CloseButton ────────────────────────────────────────────────────────────
+//  CloseButton
 
 function CloseButton({ onClick }) {
   return (
@@ -82,8 +82,7 @@ function CloseButton({ onClick }) {
   );
 }
 
-// ── PrescriptionView ───────────────────────────────────────────────────────
-// Read-only display of an existing prescription inside the detail modal.
+//  PrescriptionView
 
 function PrescriptionView({ prescription }) {
   return (
@@ -149,6 +148,7 @@ function PrescriptionView({ prescription }) {
 
 function AppointmentDetailModal({ appt, userId, onClose, onAction, acting }) {
   const isCompleted = appt.status === "completed";
+  const isConfirmed = appt.status === "confirmed";
   const isVirtualConfirmed =
     appt.type === "VIRTUAL" && appt.status === "confirmed";
 
@@ -168,6 +168,12 @@ function AppointmentDetailModal({ appt, userId, onClose, onAction, acting }) {
   const [endingSession, setEndingSession] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
 
+  // Medical records state (doctor read-only view)
+  const canViewRecords = isConfirmed || isCompleted;
+  const [records, setRecords] = useState(null);
+  const [recordsLoading, setRecordsLoading] = useState(canViewRecords);
+  const [recordsError, setRecordsError] = useState("");
+
   const handleEndSession = async (e) => {
     e.stopPropagation();
     setEndingSession(true);
@@ -182,6 +188,36 @@ function AppointmentDetailModal({ appt, userId, onClose, onAction, acting }) {
       );
     } finally {
       setEndingSession(false);
+    }
+  };
+
+  // Fetch medical records for confirmed/completed appointments
+  useEffect(() => {
+    if (!canViewRecords || !appt.patientId) return;
+    getPatientRecordsForDoctor(appt.patientId)
+      .then((res) => setRecords(res.data?.data ?? []))
+      .catch(() => setRecordsError("Failed to load medical records."))
+      .finally(() => setRecordsLoading(false));
+  }, [canViewRecords, appt.patientId]);
+
+  const handleDownloadRecord = async (reportId, fileName) => {
+    setRecordsError("");
+    try {
+      const res = await getPatientRecordSignedUrlForDoctor(
+        appt.patientId,
+        reportId,
+      );
+      const url = res.data?.data?.url;
+      if (!url) throw new Error("No URL returned");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      setRecordsError("Failed to download record. Please try again.");
     }
   };
 
@@ -467,6 +503,64 @@ function AppointmentDetailModal({ appt, userId, onClose, onAction, acting }) {
               )}
             </div>
           )}
+
+          {/* Medical Records — confirmed or completed appointments */}
+          {canViewRecords && (
+            <div className="border-t border-border pt-5">
+              <p className="text-sm font-semibold text-text-primary mb-4">
+                Patient Medical Records
+              </p>
+
+              {recordsError && <Alert type="error">{recordsError}</Alert>}
+
+              {recordsLoading ? (
+                <div className="py-6">
+                  <Loader />
+                </div>
+              ) : !records || records.length === 0 ? (
+                <div className="rounded-lg bg-bg-main border border-border px-4 py-6 text-center">
+                  <p className="text-sm text-text-muted">
+                    No medical records uploaded by this patient yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {records.map((r) => (
+                    <div
+                      key={r._id}
+                      className="rounded-lg bg-bg-main border border-border px-4 py-3 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-text-primary truncate">
+                          {r.fileName}
+                        </p>
+                        {r.description && (
+                          <p className="text-xs text-text-muted truncate">
+                            {r.description}
+                          </p>
+                        )}
+                        <p className="text-xs text-text-muted mt-0.5">
+                          {new Date(r.createdAt).toLocaleDateString("en-US", {
+                            dateStyle: "medium",
+                          })}
+                          {r.fileSize
+                            ? ` · ${(r.fileSize / 1024).toFixed(0)} KB`
+                            : ""}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadRecord(r._id, r.fileName)}
+                        className="shrink-0 px-3 py-1.5 rounded-lg border border-primary text-primary text-xs font-semibold hover:bg-bg-card transition-colors"
+                      >
+                        Download
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -671,12 +765,14 @@ export default function DoctorAppointments() {
     }
   };
 
-  // Opens the confirmation dialog; actual action fires only after doctor confirms
+  // For cancel/reject: open confirmation dialog first.
+  // For accept/complete: fire immediately — no confirmation needed.
   const requestAction = (id, action, apptStatus) => {
-    const label = action === "cancel"
-      ? (apptStatus === "pending" ? "Reject" : "Cancel")
-      : action === "confirmed" ? "Accept" : "Mark Complete";
-    setConfirmAction({ id, action, label, apptStatus });
+    if (action === "cancel") {
+      setConfirmAction({ id, action, apptStatus });
+    } else {
+      handleAction(id, action);
+    }
   };
 
   // ── Derived ──────────────────────────────────────────────────────────────
@@ -778,14 +874,16 @@ export default function DoctorAppointments() {
           appt={selectedAppt}
           userId={userId}
           onClose={() => setSelectedAppt(null)}
-          onAction={(id, action) => requestAction(id, action, selectedAppt.status)}
+          onAction={(id, action) =>
+            requestAction(id, action, selectedAppt.status)
+          }
           acting={acting}
         />
       )}
 
       {/* Cancel / Reject confirmation dialog */}
       <ConfirmDialog
-        open={!!confirmAction && (confirmAction.action === "cancel")}
+        open={!!confirmAction && confirmAction.action === "cancel"}
         icon="danger"
         title={
           confirmAction?.apptStatus === "pending"
@@ -797,7 +895,11 @@ export default function DoctorAppointments() {
             ? "The appointment request will be rejected and the patient will be notified."
             : "The confirmed appointment will be cancelled. The patient will be notified."
         }
-        confirmLabel={confirmAction?.apptStatus === "pending" ? "Yes, Reject" : "Yes, Cancel"}
+        confirmLabel={
+          confirmAction?.apptStatus === "pending"
+            ? "Yes, Reject"
+            : "Yes, Cancel"
+        }
         cancelLabel="Keep It"
         loading={acting === confirmAction?.id}
         onConfirm={() => handleAction(confirmAction.id, confirmAction.action)}

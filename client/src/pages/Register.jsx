@@ -124,6 +124,11 @@ export default function Register() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handlePhoneChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+    setForm((prev) => ({ ...prev, phone: digits }));
+  };
+
   const handleEmailChange = (e) => {
     const sanitized = e.target.value.replace(/[^a-zA-Z0-9@._-]/g, "");
     setForm((prev) => ({ ...prev, email: sanitized }));
@@ -266,10 +271,11 @@ export default function Register() {
                 label="Phone Number"
                 type="tel"
                 value={form.phone}
-                onChange={handleChange}
-                placeholder="+94 77 123 4567"
+                onChange={handlePhoneChange}
+                placeholder="e.g. 0771234567"
                 required
                 autoComplete="tel"
+                maxLength={10}
               />
             </div>
 

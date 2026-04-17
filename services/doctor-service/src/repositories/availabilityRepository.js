@@ -16,3 +16,17 @@ export const updateAvailability = (id, data) =>
 
 export const deleteAvailabilityByDoctorAndDate = (doctorId, date) =>
   AvailabilityModel.deleteOne({ doctorId, date });
+
+export const markPhaseAsBooked = (doctorId, date, phase) =>
+  AvailabilityModel.findOneAndUpdate(
+    { doctorId, date, "timeslots.phase": phase },
+    { $set: { "timeslots.$.isBooked": true } },
+    { new: true },
+  );
+
+export const unmarkPhaseAsBooked = (doctorId, date, phase) =>
+  AvailabilityModel.findOneAndUpdate(
+    { doctorId, date, "timeslots.phase": phase },
+    { $set: { "timeslots.$.isBooked": false } },
+    { new: true },
+  );

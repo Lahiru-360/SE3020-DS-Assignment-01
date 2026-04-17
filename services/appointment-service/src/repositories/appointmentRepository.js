@@ -1,4 +1,4 @@
-import AppointmentModel from '../models/appointmentModel.js';
+import AppointmentModel from "../models/appointmentModel.js";
 
 export const createAppointment = (data) => AppointmentModel.create(data);
 
@@ -13,7 +13,21 @@ export const findAppointmentsByDoctorId = (doctorId) =>
 export const updateAppointmentById = (id, updates) =>
   AppointmentModel.findByIdAndUpdate(id, updates, { new: true });
 
-export const deleteAppointmentById = (id) => AppointmentModel.findByIdAndDelete(id);
+export const deleteAppointmentById = (id) =>
+  AppointmentModel.findByIdAndDelete(id);
+
+/**
+ * Find all appointments between a specific doctor and patient
+ * (excluding cancelled ones — used for access-control checks).
+ */
+export const findAppointmentsByDoctorAndPatient = (doctorId, patientId) =>
+  AppointmentModel.find({
+    doctorId,
+    patientId,
+    status: { $ne: "cancelled" },
+  })
+    .select("_id status")
+    .limit(1);
 
 // ─── Active bookings for one doctor on one date (slot allocation) ───────────
 // dateStr must be "YYYY-MM-DD".
@@ -26,13 +40,13 @@ export const deleteAppointmentById = (id) => AppointmentModel.findByIdAndDelete(
 // - This must stay aligned with bookAppointmentService date storage logic.
 export const findActiveBookingsForDoctorOnDate = (doctorId, dateStr) => {
   const start = new Date(`${dateStr}T00:00:00.000Z`);
-  const end   = new Date(`${dateStr}T23:59:59.999Z`);
+  const end = new Date(`${dateStr}T23:59:59.999Z`);
   return AppointmentModel.find({
     doctorId,
-    date:   { $gte: start, $lte: end },
-    status: { $in: ['pending', 'confirmed'] },
-    paymentStatus: { $ne: 'failed' },
-  }).select('timeSlot');
+    date: { $gte: start, $lte: end },
+    status: { $in: ["pending", "confirmed"] },
+    paymentStatus: { $ne: "failed" },
+  }).select("timeSlot");
 };
 
 // ─── Single-slot conflict check (prevents double-booking) ───────────────────
@@ -40,14 +54,12 @@ export const findActiveBookingsForDoctorOnDate = (doctorId, dateStr) => {
 // Returns the conflicting appointment if occupied, otherwise null.
 export const findActiveBookingForSlot = (doctorId, dateStr, timeSlot) => {
   const start = new Date(`${dateStr}T00:00:00.000Z`);
-  const end   = new Date(`${dateStr}T23:59:59.999Z`);
+  const end = new Date(`${dateStr}T23:59:59.999Z`);
   return AppointmentModel.findOne({
     doctorId,
-    date:     { $gte: start, $lte: end },
+    date: { $gte: start, $lte: end },
     timeSlot,
-    status:   { $in: ['pending', 'confirmed'] },
-    paymentStatus: { $ne: 'failed' },
+    status: { $in: ["pending", "confirmed"] },
+    paymentStatus: { $ne: "failed" },
   });
 };
-
-

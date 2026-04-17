@@ -11,8 +11,6 @@ import Loader from "../../components/ui/Loader";
 import Alert from "../../components/ui/Alert";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 
-// ── Time constants (mirrors backend availabilityService.js) ───────────────
-
 const HOURS = [
   "06:00",
   "07:00",
@@ -37,8 +35,6 @@ const EVENING_INDEXES = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 const slotLabel = (idx) => `${HOURS[idx]}–${HOURS[idx + 1]}`;
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("en-US", {
     weekday: "long",
@@ -48,7 +44,6 @@ function formatDate(dateStr) {
 }
 
 // todayStr / maxDateStr use the app timezone (Asia/Colombo by default).
-// See src/utils/timezone.js — change VITE_TIMEZONE in client/.env to adjust.
 const todayStr = () => todayInTZ();
 const maxDateStr = () => addDaysInTZ(7);
 
@@ -70,13 +65,12 @@ function getIndexesForPhase(timeslots, phase) {
     .sort((a, b) => a - b);
 }
 
-// ── Slot selector ──────────────────────────────────────────────────────────
-// Renders a grid of toggleable hour-slot buttons for the given phase.
+//  Slot selector
 
 function SlotSelector({ phase, selected, onChange }) {
   const indexes = phase === "morning" ? MORNING_INDEXES : EVENING_INDEXES;
 
-  // Toggle: add if absent, remove if present. Multiple consecutive slots allowed.
+  //add if absent, remove if present. Multiple consecutive slots allowed.
   const toggle = (idx) => {
     const next = selected.includes(idx)
       ? selected.filter((i) => i !== idx)
@@ -117,8 +111,7 @@ function SlotSelector({ phase, selected, onChange }) {
   );
 }
 
-// ── Phase section ────────────────────────────────────────────────────────
-// Declared at module scope to satisfy the no-components-during-render rule.
+//  Phase section
 
 function PhaseSection({ phase, indexes, onChange }) {
   return (
@@ -144,8 +137,7 @@ function PhaseSection({ phase, indexes, onChange }) {
   );
 }
 
-// ── Existing-phase read-only display ──────────────────────────────────────
-// Shows a phase that is already saved so the doctor knows it's occupied.
+//  Existing-phase read-only display
 
 function ExistingPhaseDisplay({ phase, slot }) {
   return (
@@ -177,7 +169,7 @@ function ExistingPhaseDisplay({ phase, slot }) {
   );
 }
 
-// ── Add / Edit modal ───────────────────────────────────────────────────────
+//  Add / Edit modal
 
 function AvailabilityModal({
   mode, // "add" | "edit"
@@ -194,7 +186,6 @@ function AvailabilityModal({
 
   const [date, setDate] = useState(initialDate ?? todayStr());
 
-  // Phase-keyed slot state. In edit mode only the relevant phase is pre-filled.
   // Each phase supports multiple consecutive indexes.
   const [morningIndexes, setMorningIndexes] = useState(
     isEdit && initialPhase === "morning" ? (initialIndexes ?? []) : [],
@@ -211,7 +202,7 @@ function AvailabilityModal({
     }
   }, [date, isEdit]);
 
-  // ── Existing-phase detection (add mode only) ──────────────────
+  //  Existing-phase detection (add mode only)
   const existingDoc = !isEdit
     ? (existingDocs?.find((d) => d.date === date) ?? null)
     : null;
@@ -220,8 +211,6 @@ function AvailabilityModal({
   const existingEvening =
     existingDoc?.timeslots.find((s) => s.phase === "evening") ?? null;
   const bothPhasesExist = !isEdit && existingMorning && existingEvening;
-
-  // ── Derived ────────────────────────────────────────────────────
 
   // A phase is valid when it has at least one slot AND all selected slots are consecutive.
   const isValidPhase = (idxs) =>
@@ -258,7 +247,7 @@ function AvailabilityModal({
     }
   };
 
-  // ── Shared close button ────────────────────────────────────────
+  //  Shared close button
 
   const CloseBtn = (
     <button
@@ -325,7 +314,7 @@ function AvailabilityModal({
             </p>
           </div>
 
-          {/* ── Add mode: show both phases, respecting existing slots ─── */}
+          {/*  Add mode: show both phases, respecting existing slots  */}
           {!isEdit && (
             <>
               {existingMorning ? (
@@ -356,7 +345,7 @@ function AvailabilityModal({
             </>
           )}
 
-          {/* ── Edit mode: show only the locked phase ──────── */}
+          {/*  Edit mode: show only the locked phase  */}
           {isEdit && (
             <PhaseSection
               phase={initialPhase}
@@ -395,8 +384,6 @@ function AvailabilityModal({
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────
-
 export default function DoctorAvailability() {
   const { userId } = useAuth();
 
@@ -415,8 +402,6 @@ export default function DoctorAvailability() {
   // Pending removal awaiting doctor confirmation: null | {date, phase}
   const [pendingDelete, setPendingDelete] = useState(null);
 
-  // ── Fetch ────────────────────────────────────────────────────────────────
-
   const fetchAvailability = useCallback(() => {
     if (!userId) return;
     setLoading(true);
@@ -432,7 +417,7 @@ export default function DoctorAvailability() {
     fetchAvailability();
   }, [fetchAvailability]);
 
-  // ── Modal helpers ────────────────────────────────────────────────────────
+  //  Modal helpers
 
   const openAdd = () => {
     setSaveError("");
@@ -449,8 +434,6 @@ export default function DoctorAvailability() {
     if (!saving) setModal(null);
   };
 
-  // ── Save (add or edit) ───────────────────────────────────────────────────
-  //
   // Add mode receives: { date, slots: [{phase, indexes}, ...] }
   // Edit mode receives: { date, phase, indexes }
 
@@ -476,7 +459,7 @@ export default function DoctorAvailability() {
     }
   };
 
-  // ── Delete ───────────────────────────────────────────────────────────────
+  // Delete
 
   const handleDelete = async (date, phase) => {
     setDeleting({ date, phase });
@@ -496,11 +479,12 @@ export default function DoctorAvailability() {
   // Asks for confirmation before deleting
   const requestDelete = (date, phase) => setPendingDelete({ date, phase });
 
-  // ── Render ───────────────────────────────────────────────────────────────
-
   // Group timeslots by phase within each availability doc
+  const today = new Date().toISOString().split("T")[0];
+
   const renderAvailabilityCard = (avail) => {
     const phases = ["morning", "evening"];
+    const isPast = avail.date < today;
     return (
       <div
         key={avail._id ?? avail.date}
@@ -511,6 +495,11 @@ export default function DoctorAvailability() {
           <span className="ml-2 text-xs font-normal text-text-muted">
             {avail.date}
           </span>
+          {isPast && (
+            <span className="ml-2 inline-block rounded-full px-2 py-0.5 text-xs font-semibold bg-bg-main border border-border text-text-muted">
+              Past · Read-only
+            </span>
+          )}
         </p>
 
         <div className="space-y-3">
@@ -520,6 +509,7 @@ export default function DoctorAvailability() {
 
             const isDeletingThis =
               deleting?.date === avail.date && deleting?.phase === phase;
+            const isSlotBooked = slots.some((s) => s.isBooked);
 
             return (
               <div
@@ -541,15 +531,16 @@ export default function DoctorAvailability() {
                       onClick={() =>
                         openEdit(avail.date, phase, avail.timeslots)
                       }
-                      className="text-xs font-medium text-primary hover:underline"
+                      disabled={isPast || isSlotBooked || !!deleting}
+                      className="text-xs font-medium text-primary hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       onClick={() => requestDelete(avail.date, phase)}
-                      disabled={!!deleting}
-                      className="text-xs font-medium text-error hover:underline disabled:opacity-50"
+                      disabled={isSlotBooked || !!deleting}
+                      className="text-xs font-medium text-error hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
                     >
                       {isDeletingThis ? "Removing…" : "Remove"}
                     </button>
@@ -584,16 +575,13 @@ export default function DoctorAvailability() {
   };
 
   // Sort availability by date ascending and hide past dates.
-  // Past-date entries shouldn't normally exist (backend rejects them) but
-  // can linger if the server was running in a different timezone or from
-  // older data. Hiding them on the frontend prevents accidental edits.
   const sorted = [...availability]
     .filter((a) => !isPastDate(a.date))
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* ── Header ────────────────────────────────────────── */}
+      {/*  Header  */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">
@@ -612,11 +600,11 @@ export default function DoctorAvailability() {
         </button>
       </div>
 
-      {/* ── Feedback ──────────────────────────────────────── */}
+      {/* Feedback  */}
       {error && <Alert type="error">{error}</Alert>}
       {success && <Alert type="success">{success}</Alert>}
 
-      {/* ── Content ───────────────────────────────────────── */}
+      {/*  Content  */}
       {loading ? (
         <div className="py-20">
           <Loader />
@@ -638,7 +626,7 @@ export default function DoctorAvailability() {
         <div className="space-y-4">{sorted.map(renderAvailabilityCard)}</div>
       )}
 
-      {/* ── Add / Edit modal ──────────────────────────────── */}
+      {/*  Add / Edit modal  */}
       {modal && (
         <AvailabilityModal
           mode={modal.mode}
