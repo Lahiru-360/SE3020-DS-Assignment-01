@@ -65,7 +65,7 @@ STEP 1 - Create .env files for each service
     EMAIL_FROM=
     TWILIO_ACCOUNT_SID=           (*)
     TWILIO_AUTH_TOKEN=            (*)
-    TWILIO_MESSAGING_SERVICE_SID=
+    TWILIO_FROM_NUMBER=           (*) e.g. +1234567890 (your Twilio sender number)
 
   ── services/telemedicine-service/.env ──────────────────────────────────────
     PORT=

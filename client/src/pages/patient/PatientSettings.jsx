@@ -73,7 +73,7 @@ export default function PatientSettings() {
   const validate = () => {
     const errs = {};
     const nameRe = /^[a-zA-Z\s'-]+$/;
-    const phoneRe = /^\d{10}$/;
+    const phoneRe = /^(\+\d{1,3})?\d{9,12}$/;
 
     if (form.firstName) {
       if (!nameRe.test(form.firstName))
@@ -90,7 +90,7 @@ export default function PatientSettings() {
         errs.lastName = "Last name must not exceed 50 characters.";
     }
     if (form.phone && !phoneRe.test(form.phone)) {
-      errs.phone = "Enter a valid 10-digit phone number.";
+      errs.phone = "Enter a valid phone number.";
     }
 
     return errs;
