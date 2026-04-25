@@ -9,6 +9,7 @@ const axiosInstance = axios.create({
   baseURL: resolvedBaseURL,
   headers: {
     "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
   },
 });
 
